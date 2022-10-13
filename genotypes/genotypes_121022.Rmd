@@ -1,0 +1,1176 @@
+---
+title: "Data analyses for Global Typhoid Genomics Consortium Paper - Working Group 1 (Descriptive Stats - genotypes)"
+author: "Kat Holt"
+date: "12/10/2022"
+output:
+  html_document:
+    toc: true
+#    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = getwd())
+
+# Data wrangling
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+library(readxl)
+
+# Plotting (general)
+library(ggplot2)
+library(RColorBrewer)
+library(patchwork)
+library(ggExtra)
+
+# Plotting (maps)
+library(sf)
+library(rvest)
+library(maps)
+library(scatterpie)
+library(ggnewscale) # to allow us to specify different scales for countries and pies
+```
+
+# Section 1 - Overview of available data
+
+## Get date
+``` {r}
+todays_date <- str_replace_all(Sys.Date(),"-","")
+```
+
+## Load data
+``` {r load_data}
+
+tgc_all <- read_csv("../TGC_data_121022.csv")
+
+# total genomes
+nrow(tgc_all)
+
+```
+
+## genome size analysis
+``` {r genome_sizes}
+
+# genomes excluded due to size
+table(tgc_all$exclude_assembly)
+
+tgc_all <- tgc_all %>% 
+  mutate(IncHI1=grepl("IncHI1",`Inc Types`))
+
+table(tgc_all$IncHI1, tgc_all$exclude_assembly)
+
+genome_sizes <- tgc_all %>% 
+  ggplot( aes(y=`GENOME LENGTH`, x=IncHI1)) + 
+      geom_violin() +
+      theme_bw() + 
+      geom_hline(yintercept = 4.5E6, linetype="dashed", color="blue") + 
+      geom_hline(yintercept = 5.5E6, linetype="dashed", color="blue") +
+      labs(x="IncHI1 detected", y="Genome length (bp)", subtitle="a) All genomes, pre-filter") + 
+      scale_x_discrete(labels=c(paste0("yes (n=",sum(tgc_all$IncHI1),")"), paste0("no (n=",sum(!tgc_all$IncHI1),")")))
+
+genome_sizes
+
+genome_sizes_included <- tgc_all %>% 
+  filter(exclude_assembly != TRUE) %>%
+  ggplot( aes(y=`GENOME LENGTH`, x=IncHI1)) + 
+      geom_violin() +
+      theme_bw() + 
+      labs(x="IncHI1 detected", y="Genome length (bp)", subtitle="b) Included genomes") + 
+      scale_x_discrete(labels=c(paste0("yes (n=",sum(tgc_all$IncHI1[!tgc_all$exclude_assembly]),")"), paste0("no (n=",sum(!tgc_all$IncHI1[!tgc_all$exclude_assembly]),")")))
+
+genome_sizes_included
+
+```
+
+## Supp fig 1 - genome size
+``` {r genomesize_inc_pdf, eval=T}
+pdf(paste0("SuppFig1_genomeSize_by_inc_",todays_date,".pdf"), width=6, height=4)
+genome_sizes | genome_sizes_included
+dev.off()
+
+png(paste0("SuppFig1_genomeSize_by_inc_",todays_date,".png"), width=6, height=4, units="in", res=400)
+genome_sizes | genome_sizes_included
+dev.off()
+```
+
+## exclude genomes on basis of size
+
+``` {r}
+tgc_all <- tgc_all %>% filter(exclude_assembly != TRUE)
+
+```
+
+# Overview of dataset
+``` {r}
+# total high quality genomes
+nrow(tgc_all)
+
+# number of countries
+length(table(tgc_all$Country_Origin))
+
+# assumed acute cases
+table(tgc_all$assumedAcute)
+
+# non-targeted
+tgc_all %>% filter(startsWith(`Purpose of Sampling`, "Non")) %>% summarise(n=n())
+
+# targeted
+tgc_all %>% filter(startsWith(`Purpose of Sampling`, "Targeted")) %>% summarise(n=n())
+
+# purpose not provided
+tgc_all %>% filter(`Purpose of Sampling` == "Not Provided") %>% summarise(n=n())
+```
+
+## Supp Table 3 - samples and sources
+
+``` {r eval=T}
+source_vs_health <- table(tgc_all$Source,tgc_all$`Host Health State`)
+
+source_vs_health <- rbind(source_vs_health, Total=colSums(source_vs_health))
+
+source_vs_health <- source_vs_health[c("Blood", "Stool", "Urine", "Gallbladder", "Environment", "Other", "Not Provided", "Total"),c("Symptomatic", "Asymptomatic Carrier", "Not Provided")]
+
+write.csv(source_vs_health, file=paste0("SuppTable3_health_vs_source_excludeFails_",todays_date,".csv"))
+```
+
+## Table 1 - summary of genomes by region  
+``` {r}
+region_summary <- tgc_all %>%
+    group_by(Region)%>% 
+    summarize(region_total =n(),
+              post2010_rep =sum(Year >= 2010 & assumedAcute & untargetedSurveillance), 
+              travel_post2010=sum(`Travel Associated`=="Yes" & Year >= 2010 & assumedAcute & untargetedSurveillance), 
+              
+              ) %>%
+  adorn_totals("row") %>%
+  mutate(travel_post2010_pc = paste0(travel_post2010, " (", 
+                                          round(travel_post2010/post2010_rep*100,1), "%)")
+  ) %>% 
+  select(Region, region_total, post2010_rep, travel_post2010_pc) %>% 
+  rename(`Total genomes`=region_total, `Representative cases from 2010`=post2010_rep, `Travel (%) amongst representative cases from 2010`=travel_post2010_pc) %>%
+  mutate(Region=replace(Region, is.na(Region), "Unknown"))
+
+region_summary
+
+```
+
+``` {r eval=T}
+write.csv(region_summary, file=paste0("Table1_region_summary_",todays_date,".csv"), row.names=F)
+```
+
+## Table S4 - country breakdown 
+``` {r}
+country_summary <- tgc_all %>%
+    group_by(Region, Country_Origin)%>% 
+    summarize(n =n(),
+              travel = sum(`Travel Associated`=="Yes"),
+              untargeted_from2010 =sum(Year >= 2010 & assumedAcute & untargetedSurveillance), 
+              travel_untargeted_from2010 = sum(`Travel Associated`=="Yes" & Year >= 2010 & assumedAcute & untargetedSurveillance), 
+              ) %>%
+    adorn_totals("row") %>%
+    mutate(travel_pc = paste0(travel, " (", round(travel/n*100,1), "%)")) %>%
+    mutate(travel_untargeted_from2010_pc = paste0(travel_untargeted_from2010, " (", round(travel_untargeted_from2010/untargeted_from2010*100,1), "%)")) %>%
+  select(Region, Country_Origin, n, travel_pc, untargeted_from2010, travel_untargeted_from2010_pc) %>% 
+  rename(`Total genomes`=n, 
+         `Travel (%)`=travel_pc,
+         `Representative cases from 2010`=untargeted_from2010, 
+         `Travel (%) amongst representative cases from 2010`=travel_untargeted_from2010_pc) %>%
+  mutate(Region=replace(Region, is.na(Region), "Unknown"))
+
+```
+
+``` {r eval=T}
+write.csv(country_summary, file=paste0("SuppTable4_country_summary_",todays_date,".csv"), row.names=F)
+```
+
+## country level counts for text
+``` {r}
+country_count_by_region <- table(paste0(tgc_all$Region, ": ", tgc_all$Country_Origin))
+
+sum(country_count_by_region>=20)
+
+sum(country_count_by_region[country_count_by_region>=20])-225 # subtract the 'unknown' category
+
+(sum(country_count_by_region[country_count_by_region>=20])-225)/nrow(tgc_all)
+sum(country_count_by_region>=100)
+
+sum(country_count_by_region[country_count_by_region>=100])-225 # subtract the 'unknown' category
+
+(sum(country_count_by_region[country_count_by_region>=100])-225)/nrow(tgc_all)
+```
+
+## travel summary for text
+``` {r}
+table(tgc_all$`Travel Associated`)
+
+# labs contirbuting travel-associated isolates
+tgc_all %>% group_by(`Isolating Lab`, `Travel Associated`) %>% summarise (n=n()) %>% filter(`Travel Associated`=="Yes")
+
+# country of origin for travel-associated isolates
+tgc_all %>% group_by(Country_Origin, `Travel Associated`) %>% summarise (n=n()) %>% filter(`Travel Associated`=="Yes") %>% filter(n>35)
+
+```
+
+## define subsets for analysis
+## counts for text
+``` {r}
+
+# surveillance-ready samples only
+
+tgc_meta <- tgc_all %>%
+  filter(assumedAcute == T, 
+         untargetedSurveillance == T,
+         Country_Origin != "Not Provided")
+
+nrow(tgc_meta)
+
+# surveillance-ready samples, known years, 2010 onwards
+tgc_from2010 <- tgc_all %>%
+  filter(assumedAcute == T, 
+         untargetedSurveillance == T,
+         Country_Origin != "Not Provided",
+         Year >=2010)
+
+nrow(tgc_from2010)
+
+nrow(tgc_from2010)/nrow(tgc_meta)
+```
+
+
+# Section 2 - Geographic distribution of genotypes
+
+## Identify genotypes to include in map (ie with ≥20% freq in any country, 2010-2020)
+``` {r genotype_freqs}
+
+# genotype freqs per region, from 2010
+region_N <- tgc_from2010 %>%
+  group_by(Region)%>% 
+  summarize(region_total =n())
+
+region_geno <- tgc_from2010 %>%
+  group_by(Region, Final_genotype)%>% 
+  summarize(n =n()) %>%
+  left_join(region_N) %>% # country counts
+  mutate(geno_freq_region_from2010 = round(n/region_total*100,0)) # percent per region
+
+# genotype freqs per country, from 2010
+country_N <- tgc_from2010 %>%
+  group_by(Country_Origin)%>% 
+  summarize(country_total =n())
+
+country_geno <- tgc_from2010 %>%
+  group_by(Country_Origin, Final_genotype)%>% 
+  summarize(n =n()) %>%
+  left_join(country_N) %>% # country counts
+  mutate(geno_freq_country = round(n/country_total*100,0)) # percent per region
+
+# genotypes with ≥20% freq in any country; note this includes all H58 subtypes already
+geno_country20 <- names(table(country_geno$Final_genotype[country_geno$geno_freq_country>=20]))
+
+
+# set genotype colours
+geno_info <- read_csv("https://raw.githubusercontent.com/katholt/genotyphi/main/Genotype_specification.csv") %>% filter(Genotype %in% geno_country20)
+
+geno_colours <- c(geno_info$`Colour code`,"grey")
+names(geno_colours) <- c(geno_info$Genotype, "Other")
+geno_colours <- geno_colours[order(names(geno_colours))] # sort for legend
+
+
+# try to distinguish H58 subtypes
+geno_colours2 <- geno_colours
+geno_colours2["4.3.1.1.EA1"] = "#c18cda"
+geno_colours2["4.3.1.2.EA2"] = "#ee37c9"
+geno_colours2["4.3.1.2.EA3"] = "#94165f"
+
+```
+
+## write out genotype frequencies by region, all years
+``` {r}
+region_N_allyears <- tgc_meta %>%
+  group_by(Region)%>% 
+  summarize(region_total =n())
+
+region_geno_allyears <- tgc_meta %>%
+  group_by(Region, Final_genotype)%>% 
+  summarize(n =n()) %>%
+  left_join(region_N_allyears) %>% # region counts
+  mutate(geno_freq = round(n/region_total*100,0)) # percent per region
+
+```
+
+``` {r eval=T}
+write.csv(region_geno_allyears, file=paste0("genotype_by_worldRegion_allyears_",todays_date,".csv"), row.names=F)
+```
+
+## write out genotype frequencies by country, all years
+``` {r}
+country_N_allyears <- tgc_meta %>%
+  group_by(Country_Origin)%>% 
+  summarize(country_total =n())
+
+country_geno_allyears <- tgc_meta %>%
+  group_by(Country_Origin, Final_genotype)%>% 
+  summarize(n =n()) %>%
+  left_join(country_N_allyears) %>% # region counts
+  mutate(geno_freq = round(n/country_total*100,0)) # percent per region
+
+```
+
+``` {r eval=T}
+write.csv(country_geno_allyears, file=paste0("genotype_by_country_allyears_",todays_date,".csv"), row.names=F)
+```
+
+# Prepare data for maps with pie charts showing genotype freqs
+## read in GPS data
+``` {r}
+# read gps coordinates
+gps <- read.csv("../UN_region_coords.csv")%>%
+  select(Region, latitude, longitude)
+```
+
+## write out overall genotype prevalence per region, 2010-2020
+``` {r, eval=T}
+tgc_from2010_allgeno <- table(tgc_from2010$Region, tgc_from2010$Year)
+
+write.csv(tgc_from2010_allgeno, file=paste0("genotype_by_worldRegion_matrix_2010-2020_allGeno_",todays_date,".csv"), row.names=F)
+```
+
+## get data for 39 genotypes, with 20% country-level prevalence
+``` {r}
+# pie data, 2010 - 2020, genotype >20% prevalent in an individual country since 2010
+tgc_from2010_toMap_countryGeno <-  tgc_from2010 %>%
+  mutate(map_genotype = if_else(Final_genotype %in% geno_country20, Final_genotype, "Other"))%>%
+  select(Region, Year, Final_genotype, map_genotype)%>%
+  dcast(Region ~ map_genotype)%>%
+  left_join(gps)%>%
+  left_join(region_N)%>%
+  mutate(lat = as.numeric(latitude), 
+         long = as.numeric(longitude),
+         mytext=paste(
+            Region, "\n", 
+           "N= ", region_total, sep="")
+         )
+```
+
+## write out overall genotype prevalence per region, 2010-2020
+``` {r, eval=T}
+write.csv(tgc_from2010_toMap_countryGeno, file=paste0("genotype_by_worldRegion_matrix_2010-2020_39geno",todays_date,".csv"), row.names=F)
+```
+
+## write out genotype prevalence per country, 2010-2020
+``` {r}
+tgc_from2010 <- tgc_from2010 %>%
+  mutate(map_genotype = if_else(Final_genotype %in% geno_country20, Final_genotype, "Other"))
+
+tgc_from2010_countryFreq <- table(tgc_from2010$Country_Origin, tgc_from2010$map_genotype)
+
+country_N_from2010 <- tgc_from2010 %>%
+  group_by(Country_Origin)%>% 
+  summarize(country_total =n())
+
+tgc_from2010_countryFreq_allGeno <- tgc_from2010 %>%
+  group_by(Region, Country_Origin, Final_genotype)%>% 
+  summarize(n =n()) %>%
+  left_join(country_N_from2010) %>% # country counts
+  mutate(geno_freq = round(n/country_total*100,0)) # percent per country
+```
+
+``` {r eval=T}
+write.csv(tgc_from2010_countryFreq, file=paste0("genotypeFreqs_byCountry_2010-2020_",todays_date,".csv"))
+```
+
+``` {r eval=T}
+write.csv(tgc_from2010_countryFreq_allGeno, file=paste0("genotypeFreqs_byCountry_2010-2020_allGeno_percent_",todays_date,".csv"), row.names=F)
+```
+
+## set up to colour countries contributing data
+```{r country_contrib}
+
+typhi_countryN <- tgc_meta %>%
+  filter(Year >= 2010) %>% # restrict to last 10 years
+  group_by(Country_Origin)%>%
+  summarize(CountryCount2010=n())
+
+# match map object country names
+typhi_countryN$Country_Origin <- replace(typhi_countryN$Country_Origin, typhi_countryN$Country_Origin=="United Kingdom", "UK")
+typhi_countryN$Country_Origin <- replace(typhi_countryN$Country_Origin, typhi_countryN$Country_Origin=="Viet Nam", "Vietnam")
+
+# add N per country
+typhi_Nmap <- map_data('world') %>%
+        group_by(region) %>%
+  # Merge in Typhi counts
+  left_join(typhi_countryN, by = c('region' = 'Country_Origin'))
+
+typhi_Nmap$CountryData <- typhi_Nmap$CountryCount2010 > 0
+```
+
+# Make map with pies (39 genotypes)
+``` {r map_genotype_pies_39geno}
+genotype_pie_map_countryGeno <- ggplot(data=typhi_Nmap, aes( x = long, y = lat, group=group)) +
+  geom_polygon(data=typhi_Nmap, aes(fill = CountryData), color="grey") + 
+  scale_fill_manual(values=c("#f2e6d9"), na.value="white") + # pale brown
+  new_scale_fill() +
+    geom_scatterpie(data = tgc_from2010_toMap_countryGeno, aes(x= long, y=lat , group = Region, r = 9),
+                  cols= c(geno_country20, "Other"), color=NA, alpha=1) +
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  theme_minimal()+
+  theme(axis.text = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        legend.title = element_text(face = "bold"), 
+        legend.position="bottom")
+
+genotype_pie_map_countryGeno
+
+```
+
+## map with pies (39 genotypes) without legend
+``` {r }
+genotype_pie_map_countryGeno_nolegend <- ggplot(data=typhi_Nmap, aes( x = long, y = lat, group=group)) +
+  geom_polygon(data=typhi_Nmap, aes(fill = CountryData), color="grey") + 
+  scale_fill_manual(values=c("#f2e6d9"), na.value="white") + # pale brown
+  new_scale_fill() +
+    geom_scatterpie(data = tgc_from2010_toMap_countryGeno, aes(x= long, y=lat , group = Region, r = 9),
+                  cols= c(geno_country20, "Other"), color=NA, alpha=1) +
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  theme_minimal()+
+  theme(axis.text = element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        legend.title = element_text(face = "bold"), 
+        legend.position="none") +
+  ggtitle("a) Genotype prevalence by world region, 2010-2020")
+
+genotype_pie_map_countryGeno_nolegend
+
+```
+
+## PDF of map with 39 genotypes - final figure
+``` {r genotype_map_country_pdf, eval=T}
+pdf(paste0("genotype_map",todays_date,".pdf"), width=9, height=6)
+genotype_pie_map_countryGeno
+dev.off()
+```
+
+# Facet plot genotypes per country, for 2010-2020, 39 genotypes
+
+## facet plot genotypes per country, normalised (%)
+``` {r}
+#select for 2010 - 2020, H58 genotypes plus any genotype >20% prevalent in an individual country
+country_year_data_39geno <- tgc_meta %>%
+  mutate(map_genotype = if_else(Final_genotype %in% geno_country20, Final_genotype, "Other"))%>%
+   filter(Year >=2010) 
+
+country_facet_39geno <- ggplot(country_year_data_39geno, aes(fill=map_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin, ncol=6) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 6, colour = "black"), legend.text = element_text(size=8), legend.key.size=unit(0.25, "cm"), legend.title = element_text(size=8, face="bold")) +
+  guides(fill=guide_legend(ncol=1))
+
+country_facet_39geno
+```
+
+## facet plot genotypes per country, excluding key countries, normalised (%)
+``` {r}
+
+countryN <- table(tgc_from2010$Country_Origin)
+country50 <- names(countryN[countryN>=50])
+
+country_facet_39geno_exclKey <- country_year_data_39geno %>%
+  filter(!(Country_Origin %in% country50)) %>%
+  ggplot(aes(fill=map_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin, ncol=6) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 6, colour = "black"), legend.text = element_text(size=10), legend.key.size=unit(0.25, "cm"), legend.title = element_text(size=10, face="bold")) +
+  guides(fill=guide_legend(ncol=1))
+
+country_facet_39geno_exclKey
+```
+
+``` {r country_facet_pdf, eval=T}
+pdf(file=paste0("SuppFig_country_facet_exclKey_",todays_date,".pdf"),width=13,height=18)
+country_facet_39geno_exclKey
+dev.off()
+```
+
+## facet plot genotypes per country (N)
+
+``` {r country_facet_N_39geno}
+
+country_facet_N <- ggplot(country_year_data_39geno, aes(fill=map_genotype, x=Year)) + 
+  geom_bar() + 
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin, ncol=6, scales="free_y") + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6, colour = "black"))
+```
+
+``` {r country_facet_N_pdf, eval=T}
+pdf(file=paste0("country_facet_N_39geno_",todays_date,".pdf"),width=12,height=18)
+country_facet_N
+dev.off()
+```
+
+
+## facet plot genotypes per region, normalised (%)
+``` {r}
+region <- table(country_year_data_39geno$Region)
+region <- names(region[region>=20])
+
+region_facet_39geno <- country_year_data_39geno %>%
+  filter(Year <=2020) %>%
+  filter(Region %in% region) %>%
+  ggplot(aes(fill=map_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region , ncol=3) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 6, colour = "black"), legend.text = element_text(size=8), legend.key.size=unit(0.25, "cm"), legend.title = element_text(size=8, face="bold")) +
+  guides(fill=guide_legend(ncol=1))+
+  ggtitle("b) Annual genotype distributions, for regions with at least 20 genomes")
+
+region_facet_39geno
+```
+
+``` {r region_facet_pdf, eval=T}
+pdf(file=paste0("SuppFig_region_facet_39geno_",todays_date,".pdf"),width=7.5,height=9)
+region_facet_39geno
+dev.off()
+```
+
+``` {r region_facet_map_pdf, eval=T}
+pdf(file=paste0("SuppFig_region_facet_map_39geno_",todays_date,".pdf"),width=7.5,height=8)
+genotype_pie_map_countryGeno_nolegend + region_facet_39geno + plot_layout(nrow=2, heights=c(2,3), guides = 'collect')
+dev.off()
+```
+
+## facet plot genotypes per country, normalised (%) - key countries
+``` {r}
+                  
+#select for 2010 - 2020, H58 genotypes plus any genotype >20% prevalent in an individual country
+country_facet_39geno_keycountries <- tgc_meta %>%
+  mutate(map_genotype = if_else(Final_genotype %in% geno_country20, Final_genotype, "Other"))%>%
+  select(Year, map_genotype, Region, Country_Origin)%>%
+  filter(Year >=2010 & Year <=2020) %>%
+  filter(Country_Origin %in% country50) %>%
+  filter(!(Country_Origin %in% c("United Kingdom","USA"))) %>%
+  ggplot(aes(fill=map_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin, ncol=3) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 6, colour = "black"), legend.text = element_text(size=8), legend.key.size=unit(0.25, "cm"), legend.title = element_text(size=8, face="bold")) +
+  guides(fill=guide_legend(ncol=1))+
+  ggtitle("b) Annual genotype prevalence, for countries with at least 50 genomes")
+
+country_facet_39geno_keycountries
+```
+
+
+``` {r country_facet_key_pdf, eval=T}
+pdf(file=paste0("genotypesMainCountries_facet_",todays_date,".pdf"),width=7,height=6)
+country_facet_39geno_keycountries
+dev.off()
+```
+
+## facet plot genotypes per country, N - key countries
+``` {r}
+country_facet_39geno_keycountries_N <- tgc_meta %>%
+  mutate(map_genotype = if_else(Final_genotype %in% geno_country20, Final_genotype, "Other"))%>%
+  select(Year, map_genotype, Region, Country_Origin)%>%
+  filter(Year >=2010 & Year <=2020) %>%
+  filter(Country_Origin %in% country50) %>%
+  ggplot(aes(fill=map_genotype, x=Year)) + 
+  geom_bar() + 
+  scale_fill_manual(values = geno_colours2)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin, ncol=3, scales="free_y") + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 6, colour = "black"))
+
+country_facet_39geno_keycountries_N
+```
+
+``` {r country_facet_keyN_pdf, eval=T}
+pdf(file=paste0("genotypesMainCountries_facetN_",todays_date,".pdf"),width=12,height=18)
+country_facet_39geno_keycountries_N
+dev.off()
+```
+
+
+``` {r country_facet_key_map_pdf, eval=T}
+pdf(file=paste0("MainFig_map_genotypesMainCountries_facet_",todays_date,".pdf"),width=7,height=9)
+#genotype_pie_map_countryGeno_nolegend + country_facet_39geno_keycountries +
+  #plot_layout(nrow=2, heights=c(2,3), guides = 'collect')
+  genotype_pie_map_countryGeno_nolegend / (country_facet_39geno_keycountries +  guide_area() + plot_layout(widths=c(5,1))) + plot_layout(nrow=2, heights=c(2,3))
+dev.off()
+```
+
+## facet plot genotypes per country, key countries, MDR
+``` {r}
+              
+mdr_genotypes_key_countries <- tgc_meta %>%
+  select(Year, Final_genotype, Region, Country_Origin, MDR)%>%
+  filter(Year >=2010 & Year <=2020) %>%
+  filter(Country_Origin %in% country50) %>%
+  filter(!(Country_Origin %in% c("United Kingdom","USA"))) %>%
+  mutate(MDR_geno = ifelse(MDR, Final_genotype, "Non-MDR"))
+
+geno_colours_mdr <- geno_colours[names(table(mdr_genotypes_key_countries$MDR_geno))]
+geno_colours_mdr["4.3.1.3"] <- geno_colours["4.3.1.3.Bdq"]
+geno_colours_mdr["Non-MDR"] <- "lightgrey"
+geno_colours_mdr <- na.omit(geno_colours_mdr)
+
+mdr_genotypes_key_countries$MDR_geno <- factor(mdr_genotypes_key_countries$MDR_geno, levels=names(table(mdr_genotypes_key_countries$MDR_geno))[c(12,1:11)], ordered=T)
+
+country_facet_39geno_keycountries_MDR <- mdr_genotypes_key_countries %>%
+  ggplot(aes(fill=MDR_geno, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours_mdr)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin, ncol=3) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 8, colour = "black"), legend.text = element_text(size=8), legend.key.size=unit(0.25, "cm"), legend.title = element_text(size=8, face="bold")) +
+  guides(fill=guide_legend(ncol=1))+
+  ggtitle("a) Annual MDR genotype prevalence, for countries with at least 50 genomes")
+
+country_facet_39geno_keycountries_MDR
+
+```
+
+## facet plot genotypes per country, key countries, CipI
+``` {r}
+              
+cipIR_genotypes_key_countries <- tgc_meta %>%
+  select(Year, Final_genotype, Region, Country_Origin, cipIR)%>%
+  filter(Year >=2010 & Year <=2020) %>%
+  filter(Country_Origin %in% country50) %>%
+  filter(!(Country_Origin %in% c("United Kingdom","USA"))) %>%
+  mutate(cipIR_geno = ifelse(cipIR, Final_genotype, "CipS"))
+
+geno_cip <- names(table(cipIR_genotypes_key_countries$Final_genotype)[table(cipIR_genotypes_key_countries$Final_genotype)>=10])
+
+geno_colours_cipI <- read_csv("https://raw.githubusercontent.com/katholt/genotyphi/main/Genotype_specification.csv") %>% filter(Genotype %in% geno_cip)
+
+geno_colours_cipIR <- c(geno_colours_cipI$`Colour code`, "grey")
+names(geno_colours_cipIR) <- c(geno_colours_cipI$Genotype, "Other")
+geno_colours_cipIR <- geno_colours_cipIR[order(names(geno_colours_cipIR))]
+geno_colours_cipIR["CipS"] <- "lightgrey"
+
+cipIR_genotypes_key_countries$cipIR_geno <- factor(cipIR_genotypes_key_countries$cipIR_geno, levels=c("CipS",geno_cip), ordered=T)
+
+country_facet_39geno_keycountries_cipIR <- cipIR_genotypes_key_countries %>%
+  mutate(group_genotype = if_else(Final_genotype %in% geno_colours_cipI, Final_genotype, "Other"))%>%
+  ggplot(aes(fill=cipIR_geno, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours_cipIR)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin, ncol=3) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=12, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 8, colour = "black"), legend.text = element_text(size=8), legend.key.size=unit(0.25, "cm"), legend.title = element_text(size=8, face="bold")) +
+  guides(fill=guide_legend(ncol=1))+
+  ggtitle("b) Annual CipI genotype prevalence, for countries with at least 50 genomes")
+
+country_facet_39geno_keycountries_cipIR
+
+```
+
+## MDR and CipIR genotypes, countries with ≥50 genomes
+``` {r country_facet_MDR_CipIR_geno_pdf, eval=T}
+pdf(file=paste0("SuppFig_genotypesMainCountries_MDR_CipIR_",todays_date,".pdf"),width=9,height=12)
+country_facet_39geno_keycountries_MDR / country_facet_39geno_keycountries_cipIR
+dev.off()
+```
+
+# Genotype freqs per lab, 2010-2020 - all countries
+
+## genotype barplot facet plot - all countries and labs
+``` {r country_facet_lab}
+#select for 2010 - 2020, H58 genotypes plus any genotype >20% prevalent in an individual country
+country_lab_year_data <- tgc_from2010 %>%
+  mutate(map_genotype = if_else(Final_genotype %in% geno_country20, Final_genotype, "Other"))%>%
+  mutate(`Isolating Lab`=replace(`Isolating Lab`, Input_Sheet=="COMPLETE_TyphiMetadata_SEFI", "SEFI")) %>%
+  mutate(Country_lab_label = paste(Region, ":", Country_Origin, ":", `Isolating Lab`)) %>%
+  select(Country_lab_label, Year, map_genotype, Final_genotype, Region, Country_Origin, `Isolating Lab`)%>%
+  filter(Year >=2010) 
+
+country_facet_lab <- country_lab_year_data %>% ggplot(aes(fill=map_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin + `Isolating Lab`, ncol=6) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6, colour = "black"))
+
+```
+
+``` {r country_facet_lab_pdf, eval=T}
+pdf(file=paste0("country_facet_lab_all_",todays_date,".pdf"),width=12,height=38)
+country_facet_lab
+dev.off()
+```
+
+# Genotype freqs per lab, 2010-2020 - South Asia
+## Compare key genotype frequencies across countries, by lab - South Asia
+``` {r}
+
+country_lab_year_data_SA <- country_lab_year_data %>% 
+  filter(Country_Origin %in% c("Bangladesh", "India", "Nepal", "Pakistan"))
+
+country_lab_year_data_SA <- country_lab_year_data_SA %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CDC", "*US (CDC)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="PHE", "*England (PHE)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="MDU", "*Australia (MDU)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="ESR", "*New Zealand (ESR)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CHR", "Dhaka (CHR)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="ICD", "Dhaka (ICD)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CMH", "Chittagong (ICD)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="AII", "New Delhi (AII)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CML", "Ludhiana (CML)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CNH", "New Delhi (CNH)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="KHM", "Mumbai (KHM)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="KKC", "Chennai (KKC)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="RDT", "Andhra Pradesh (RDT)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="SAP", "New Delhi (SAP)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CMC", "Vellore (CMC)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="KIMS", "Mumbai (KIM)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="PGI", "Chandigarh (PGI)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="SJB", "Bengaluru (SJB)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="KUH", "Dhulikhel (KUH)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="PAH", "Lalitpur (PAH)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="AKU", "Karachi (AKU)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="JHL", "Lahore (JHL)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="SEFI", "Multi-site (SEFI)")) 
+
+lab_N_SA <- country_lab_year_data_SA %>%
+  group_by(Country_Origin, `Isolating Lab`)%>% 
+  summarize(lab_total =n())
+
+lab_N_SA
+
+country_lab_data_SA_genotypeFreq <- country_lab_year_data_SA %>% 
+  group_by(Country_Origin, `Isolating Lab`, Final_genotype) %>%
+  summarise (n=n())%>%
+  left_join(lab_N_SA) %>% # annual lab counts
+  mutate(lab_freq = n/lab_total, 
+         lab_freq_var = sqrt((lab_freq*(1-lab_freq))/lab_total),
+         min=lab_freq-1.96*lab_freq_var,
+         max=lab_freq+1.96*lab_freq_var)
+```
+
+## add pooled country-wide estimate with CIs
+``` {r }
+# add pooled estimate
+tgc_from2010_countryFreq_allGeno_SA <- tgc_from2010_countryFreq_allGeno %>% 
+  filter(Country_Origin %in% c("India", "Bangladesh","Nepal","Pakistan")) %>%
+  mutate(lab_freq=n/country_total) %>%
+  mutate(lab_freq_var = sqrt((lab_freq*(1-lab_freq))/n),
+         min=lab_freq-1.96*lab_freq_var,
+         max=lab_freq+1.96*lab_freq_var
+  ) %>%
+  mutate(`Isolating Lab`="(Pooled)", lab_total=country_total)
+```
+
+
+## facet estimate plot for key genotypes - need to fix alpha scaling
+``` {r} 
+# choose most common genotypes to plot
+SA_geno_freq <- rev(sort(table(country_lab_year_data_SA$Final_genotype)))
+
+country_lab_data_SA_genotypeFreq <- country_lab_data_SA_genotypeFreq %>% 
+  bind_rows(tgc_from2010_countryFreq_allGeno_SA) 
+
+country_lab_data_SA_genotypeFreq_estimates <-
+country_lab_data_SA_genotypeFreq %>%
+  mutate(pooled=if_else(`Isolating Lab`=="(Pooled)",1,0.5)) %>%
+  filter(Final_genotype %in% names(SA_geno_freq[1:9])) %>%
+  filter(lab_total >=20) %>%
+  mutate(country_lab=paste(Country_Origin, ":", `Isolating Lab`)) %>%
+  ggplot() +
+ # geom_pointrange( mapping=aes(y=country_lab, x=lab_freq, xmin=min, xmax=max, colour=Country_Origin, alpha=pooled), fatten=1) +
+  geom_linerange( mapping=aes(y=country_lab,  xmin=min, xmax=max, colour=Country_Origin)) +
+  geom_point(mapping=aes(y=country_lab, x=lab_freq, colour=Country_Origin, alpha=pooled), size=1) +
+  facet_wrap(. ~ Final_genotype, ncol=3) + theme_bw() +
+  scale_color_manual(values=c("red","blue","orange","black")) + 
+  xlab("Genotype prevalence estimate (%)") +
+  guides(alpha = "none") +
+  labs(color="Country:")+ 
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 8, colour = "black"), axis.text.y = element_text(size = 7, colour = "black"), legend.title = element_text(size=10, face="bold"), legend.position="bottom")
+
+country_lab_data_SA_genotypeFreq
+```
+
+
+``` {r country_lab_data_SA_genotypeFreq_estimates_pdf, eval=T}
+pdf(file=paste0("SuppFig_country_lab_data_SA_genotypeFreq_estimates_",todays_date,".pdf"),width=8,height=12)
+country_lab_data_SA_genotypeFreq_estimates
+dev.off()
+```
+
+## compare CIs
+``` {r}
+# merge estimates
+labs <- country_lab_data_SA_genotypeFreq %>% 
+  mutate(country_geno=paste(Country_Origin, Final_genotype))
+
+pooled <- tgc_from2010_countryFreq_allGeno_SA %>% 
+  mutate(country_geno=paste(Country_Origin, Final_genotype)) %>%
+  rename(pooled_freq=lab_freq, pooled_min=min, pooled_max=max)
+
+labs_pooled <- left_join(labs, pooled, by="country_geno")
+
+labs_pooled <- labs_pooled %>% 
+  filter(Final_genotype.x %in% names(SA_geno_freq[1:9])) %>%
+  filter(lab_total.x >=20)
+
+nrow(labs_pooled)
+
+labs_pooled_overlap_estimate <- labs_pooled %>%
+  filter((lab_freq > pooled_min) & (lab_freq < pooled_max))
+
+nrow(labs_pooled_overlap_estimate)
+
+labs_pooled_overlap_interval <- labs_pooled %>%
+  filter(!(max<pooled_min | min>pooled_max))
+
+nrow(labs_pooled_overlap_interval)
+```
+
+``` {r eval=T}
+write.csv(country_lab_data_SA_genotypeFreq, file=paste0("country_lab_data_SA_genotypeFreq_",todays_date,".csv"))
+```
+
+## Genotype freqs annual dist per lab, 2010-2020 - South Asia, labs with N≥20
+``` {r country_facet_lab_SAsia}
+
+country_lab_year_data_SA <- country_lab_year_data %>% 
+  filter(Country_Origin %in% c("Bangladesh", "India", "Nepal", "Pakistan"))
+
+# set genotype colours
+geno_info_SA <- read_csv("https://raw.githubusercontent.com/katholt/genotyphi/main/Genotype_specification.csv") %>% filter(Genotype %in% country_lab_year_data_SA$Final_genotype)
+
+geno_colours_SA <- c(geno_info_SA$`Colour code`)
+
+names(geno_colours_SA) <- c(geno_info_SA$Genotype)
+
+# distinguish H58 subtypes
+geno_colours_SA["4.3.1.2.EA2"] = "#ee37c9"
+geno_colours_SA["4.3.1.2.EA3"] = "#94165f"
+
+geno_colours_SA <- geno_colours_SA[order(names(geno_colours_SA))] # sort for legend
+
+lab_counts <- table(country_lab_year_data$Country_lab_label)
+
+# South Asian countries with multiple source labs, with N≥10 per lab
+country_facet_lab_SAsia <- country_lab_year_data_SA %>% 
+  filter(Country_lab_label %in% names(lab_counts[lab_counts>=20])) %>%
+  ggplot(aes(fill=Final_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours_SA)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Country_Origin + `Isolating Lab`, ncol=7) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=9, face="bold"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6, colour = "black"))
+
+country_facet_lab_SAsia_toCombineWithAMR <- country_lab_year_data_SA %>% 
+  filter(Country_lab_label %in% names(lab_counts[lab_counts>=20])) %>%
+  filter(`Isolating Lab` != "JHL") %>% # remove JHL with 27 iso from Pakistan same year
+  ggplot(aes(fill=Final_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours_SA)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Country_Origin + `Isolating Lab`, ncol=5) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 6, colour = "black"), legend.title=element_text(size=8, face="bold"), legend.text = element_text(size=8), legend.key.size=unit(.25, "cm"))
+
+# N rather than pc
+country_facet_lab_SAsia_N <- country_lab_year_data %>% 
+  filter(Country_Origin %in% c("Bangladesh", "India", "Nepal", "Pakistan")) %>% 
+  filter(Country_lab_label %in% names(lab_counts[lab_counts>=20])) %>%
+  ggplot(aes(fill=Final_genotype, x=Year)) + 
+  geom_bar() + 
+  scale_fill_manual(values = geno_colours_SA)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin + `Isolating Lab`, ncol=6, scales="free_y") + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=9, face="bold"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6, colour = "black"))
+```
+
+``` {r country_facet_lab_Asia_N_pdf, eval=T}
+pdf(file=paste0("country_facet_lab_Asia_N_",todays_date,".pdf"),width=12,height=8)
+country_facet_lab_SAsia_N
+dev.off()
+```
+
+``` {r SuppFig_facet_lab_Asia_pdf, eval=T}
+pdf(file=paste0("SuppFig_country_facet_lab_Asia_",todays_date,".pdf"),width=12,height=8)
+country_facet_lab_SAsia
+dev.off()
+```
+
+# Genotype freqs per lab, 2010-2020 - Africa 
+## Genotype freqs per lab, 2010-2020 - Africa, labs with N≥5
+``` {r country_facet_lab_Africa}
+country_lab_year_data_EWAfrica <- country_lab_year_data %>% 
+  filter(Country_Origin %in% c("Ghana", "Nigeria", "Zimbabwe"))
+
+# set genotype colours
+geno_info_EWA <- read_csv("https://raw.githubusercontent.com/katholt/genotyphi/main/Genotype_specification.csv") %>% filter(Genotype %in% country_lab_year_data_EWAfrica$Final_genotype)
+
+geno_colours_EWA <- c(geno_info_EWA$`Colour code`,"grey")
+
+names(geno_colours_EWA) <- c(geno_info_EWA$Genotype, "Other")
+
+# distinguish H58 subtypes
+geno_colours_EWA["4.3.1.1.EA1"] = "#c18cda"
+geno_colours_EWA["4.3.1.2.EA2"] = "#ee37c9"
+geno_colours_EWA["4.3.1.2.EA3"] = "#94165f"
+
+geno_colours_EWA <- geno_colours_EWA[order(names(geno_colours_EWA))] # sort for legend
+
+country_facet_lab_Africa <- country_lab_year_data_EWAfrica %>% 
+  filter(Country_lab_label %in% names(lab_counts[lab_counts>=5])) %>%
+  filter(!is.na(`Isolating Lab`)) %>%
+  ggplot(aes(fill=Final_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours_EWA)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin + `Isolating Lab`, ncol=2) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=9, face="bold"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6, colour = "black"))
+
+country_facet_lab_Africa_N <- country_lab_year_data_EWAfrica %>% 
+  filter(Country_lab_label %in% names(lab_counts[lab_counts>=5])) %>%
+  filter(!is.na(`Isolating Lab`)) %>%
+  ggplot(aes(fill=Final_genotype, x=Year)) + 
+  geom_bar() + 
+  scale_fill_manual(values = geno_colours_EWA)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  facet_wrap(~Region + Country_Origin + `Isolating Lab`, ncol=2, scales="free_y") + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=9, face="bold"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6, colour = "black"))
+```
+
+``` {r country_facet_lab_Africa_pdf, eval=T}
+pdf(file=paste0("country_facet_lab_Africa_",todays_date,".pdf"),width=6,height=8)
+country_facet_lab_Africa
+dev.off()
+```
+
+``` {r country_facet_lab_Africa_N_pdf, eval=T}
+pdf(file=paste0("country_facet_lab_Africa_N_",todays_date,".pdf"),width=6,height=8)
+country_facet_lab_Africa_N
+dev.off()
+```
+
+``` {r facet_genoDist_Nigeria_pdf}
+
+country_lab_year_data_Nigeria <- country_lab_year_data_EWAfrica %>% 
+  filter(Country_lab_label %in% names(lab_counts[lab_counts>=10])) %>%
+  filter(Country_Origin=="Nigeria") 
+
+geno_colours_Nigeria <- geno_colours_EWA[names(geno_colours_EWA) %in% country_lab_year_data_Nigeria$Final_genotype]
+
+country_facet_lab_Nigeria <- country_lab_year_data_Nigeria %>%
+  ggplot(aes(fill=Final_genotype, x=Year)) + 
+  geom_bar(position="fill") + 
+  scale_fill_manual(values = geno_colours_Nigeria)+
+  labs(fill = "Genotype")+
+  ylab("")+
+  xlab("")+
+  ggtitle("c) Annual genotype prevalence, by lab") +
+  facet_wrap(~`Isolating Lab`, ncol=2) + 
+#  facet_wrap(~Region + Country_Origin + `Isolating Lab`, ncol=2) + 
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=9, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 7, colour = "black"), axis.text.y = element_text(size = 7, colour = "black"), legend.title = element_text(size = 7, colour = "black", face="bold"), legend.text = element_text(size = 7, colour = "black"), axis.title.y = element_text(size=8, face="bold"), plot.title=element_text(size = 9, colour = "black", face="bold"), legend.key.size=unit(.25, "cm"))
+```
+
+``` {r country_facet_lab_Nigeria_pdf, eval=T}
+pdf(file=paste0("country_facet_lab_Nigeria",todays_date,".pdf"),width=6,height=4)
+country_facet_lab_Nigeria
+dev.off()
+```
+
+## Compare key genotype frequencies across countries, by lab, Africa
+``` {r}
+
+lab_N_EWA <- country_lab_year_data_EWAfrica %>%
+  group_by(Country_Origin, `Isolating Lab`)%>% 
+  summarize(lab_total =n())
+
+lab_N_EWA
+
+country_lab_data_EWA_genotypeFreq <- country_lab_year_data_EWAfrica %>% 
+  group_by(Country_Origin, `Isolating Lab`, Final_genotype) %>%
+  summarise (n=n())%>%
+  left_join(lab_N_EWA) %>% # annual lab counts
+  mutate(lab_freq = n/lab_total, 
+         lab_freq_var = sqrt((lab_freq*(1-lab_freq))/lab_total),
+         min=lab_freq-1.96*lab_freq_var,
+         max=lab_freq+1.96*lab_freq_var)
+```
+
+## add pooled country-wide estimate with CIs
+``` {r }
+# add pooled estimate
+tgc_from2010_countryFreq_allGeno_EWA <- tgc_from2010_countryFreq_allGeno %>% 
+  filter(Country_Origin %in% c("Ghana", "Zimbabwe", "Nigeria")) %>%
+  mutate(lab_freq=n/country_total) %>%
+  mutate(lab_freq_var = sqrt((lab_freq*(1-lab_freq))/n),
+         min=lab_freq-1.96*lab_freq_var,
+         max=lab_freq+1.96*lab_freq_var
+  ) %>%
+  mutate(`Isolating Lab`="(Pooled)", lab_total=country_total)
+```
+
+
+## facet estimate plot for key genotypes - need to fix alpha scaling
+``` {r} 
+# choose most common genotypes to plot
+EWA_geno_freq <- rev(sort(table(country_lab_year_data_EWAfrica$Final_genotype)))
+
+country_lab_data_EWA_genotypeFreq <- country_lab_data_EWA_genotypeFreq %>% 
+  bind_rows(tgc_from2010_countryFreq_allGeno_EWA) 
+
+country_lab_data_EWA_genotypeFreq_estimates <-
+country_lab_data_EWA_genotypeFreq %>%
+  mutate(pooled=if_else(`Isolating Lab`=="(Pooled)",1,0.5)) %>%
+  filter(Final_genotype %in% names(EWA_geno_freq[1:6])) %>%
+  filter(lab_total >=5) %>%
+  mutate(country_lab=paste(Country_Origin, `Isolating Lab`)) %>%
+  ggplot() +
+ # geom_pointrange( mapping=aes(y=country_lab, x=lab_freq, xmin=min, xmax=max, colour=Country_Origin, alpha=pooled), fatten=1) +
+  geom_linerange( mapping=aes(y=country_lab,  xmin=min, xmax=max, colour=Country_Origin)) +
+  geom_point(mapping=aes(y=country_lab, x=lab_freq, colour=Country_Origin, alpha=pooled), size=1) +
+  facet_wrap(. ~ Final_genotype, ncol=3) + theme_bw() +
+  scale_color_manual(values=c("red","blue","black")) + 
+  xlab("Genotype prevalence estimate (%)") +
+  labs(color="Country")+ 
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 8, colour = "black"), axis.text.y = element_text(size = 7, colour = "black"), legend.title = element_text(size=10, face="bold"))
+
+```
+
+## Nigeria genotype frequency estimates
+``` {r}
+# Nigeria only
+country_lab_data_Nigeria_genotypeFreq_estimates <-
+country_lab_data_EWA_genotypeFreq %>%
+  mutate(pooled=if_else(`Isolating Lab`=="(Pooled)","Pooled","Individual")) %>%
+  filter(Country_Origin=="Nigeria") %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CDC", "*US (CDC)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="PHE", "*England (PHE)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="IBA", "Ibadan (IBD)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="ZMC", "Abuja (ZMC)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="(Pooled)", "Nigeria (Pooled)")) %>%
+  filter(Final_genotype %in% names(EWA_geno_freq[1:6])) %>%
+  filter(lab_total >=10) %>%
+  ggplot() +
+  geom_linerange( mapping=aes(y=`Isolating Lab`,  xmin=min, xmax=max, colour=pooled)) +
+  geom_point(mapping=aes(y=`Isolating Lab`, x=lab_freq, colour=pooled), size=1) +
+  facet_wrap(. ~ Final_genotype, ncol=3) + theme_bw() +
+  scale_color_manual(values=c("red","black")) + 
+  xlab("") +
+  ylab("") +
+  labs(color="Estimate type")+ 
+  ggtitle("a) Genotype prevalence, by lab") +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 7, colour = "black"), axis.text.y = element_text(size = 7, colour = "black"), legend.title = element_text(size=8, face="bold"), legend.text = element_text(size = 7, colour = "black"), axis.title.x = element_text(size=8, face="bold"), plot.title=element_text(size = 9, colour = "black", face="bold"))
+
+country_lab_data_Nigeria_genotypeFreq_estimates
+
+country_lab_data_EWA_genotypeFreq
+```
+
+
+``` {r country_lab_data_nigeria_genotypeFreq_estimates_pdf, eval=T}
+pdf(file=paste0("country_lab_data_Nigeria_genotypeFreq_estimates_",todays_date,".pdf"),width=5,height=3)
+country_lab_data_Nigeria_genotypeFreq_estimates
+dev.off()
+```
+
+``` {r nigeria_lab_comparisons}
+pdf(file=paste0("SuppFig_Nigeria_labcomparisons_",todays_date,".pdf"),width=5,height=6)
+country_lab_data_Nigeria_genotypeFreq_estimates / country_facet_lab_Nigeria
+  dev.off()
+```
+
+## compare CIs
+``` {r}
+# merge estimates
+labs <- country_lab_data_EWA_genotypeFreq %>% 
+  mutate(country_geno=paste(Country_Origin, Final_genotype))
+
+pooled <- tgc_from2010_countryFreq_allGeno_EWA %>% 
+  mutate(country_geno=paste(Country_Origin, Final_genotype)) %>%
+  rename(pooled_freq=lab_freq, pooled_min=min, pooled_max=max)
+
+labs_pooled <- left_join(labs, pooled, by="country_geno")
+
+labs_pooled <- labs_pooled %>% 
+  filter(Final_genotype.x %in% names(EWA_geno_freq[1:6])) %>%
+  filter(lab_total.x >=5)
+
+nrow(labs_pooled)
+
+labs_pooled_overlap_estimate <- labs_pooled %>%
+  filter((lab_freq > pooled_min) & (lab_freq < pooled_max))
+
+nrow(labs_pooled_overlap_estimate)
+
+labs_pooled_overlap_interval <- labs_pooled %>%
+  filter(!(max<pooled_min | min>pooled_max))
+
+nrow(labs_pooled_overlap_interval)
+```
+
+``` {r eval=T}
+write.csv(country_lab_data_EWA_genotypeFreq, file=paste0("country_lab_data_Africa_genotypeFreq_",todays_date,".csv"))
+```
