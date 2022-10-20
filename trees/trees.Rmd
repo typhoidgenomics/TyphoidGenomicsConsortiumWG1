@@ -1,0 +1,114 @@
+---
+title: "Trees"
+author: "Kat Holt"
+date: "20/10/2022"
+output:
+  html_document:
+    toc: true
+#    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = getwd())
+
+# Data wrangling
+library(tidyverse)
+library(dplyr)
+
+# Plotting (general)
+library(ggplot2)
+library(patchwork)
+
+# trees
+library(treeio)
+library(ggtree)
+library(ggnewscale)
+
+```
+
+# Load metadata
+``` {r load_data}
+tgc_all <- read_csv("../TGC_data_121022.csv")
+```
+
+# 4.3.1.1.P1 tree
+
+``` {r}
+# tipnames match on 'DisplayName' column
+t <- read.tree("pathogenwatch-styphi-jf64rcfrxdyy-rwp1-pk1-klemm-rasheed-collection-tree.nwk")
+```
+
+``` {r}
+
+t_noOutgroup <- drop.tip(t, "4714STDY6831711") # drop 3.0.1 outlier as it obscures detail
+t_noOutgroup <- drop.tip(t_noOutgroup, "4714STDY6837119") # drop long branch strain 4714STDY6837119
+
+tree_data <- tgc_all %>% 
+  select(DisplayName, Final_genotype, Year, `blaCTX-M-15_23`, gyrA_S83F, qnrS, MDR, XDR) %>% 
+  filter(DisplayName %in% t_noOutgroup$tip.label) %>%
+  rename(`blaCTX-M-15`=`blaCTX-M-15_23`) %>%
+  rename(label=DisplayName) %>%
+  mutate(`blaCTX-M-15` = if_else(`blaCTX-M-15`==1, "present", "absent")) %>%
+  mutate(qnrS = if_else(qnrS==1, "present", "absent")) %>%
+  mutate(gyrA_S83F = if_else(gyrA_S83F==1, "present", "absent")) %>%
+  mutate(MDR = if_else(MDR, "present", "absent")) %>%
+  mutate(XDR = if_else(XDR, "present", "absent"))
+
+tree_data_forObject <- tree_data %>% select(label, Final_genotype) %>% mutate(rw=if_else(label=="Rwp1-PK1", "Rwp1-PK1", ""))
+tree_data_forHeatmap <- tree_data %>% select(-Final_genotype)
+
+# set genotype colours
+geno_info <- read_csv("https://raw.githubusercontent.com/katholt/genotyphi/main/Genotype_specification.csv") %>% filter(Genotype %in% tree_data$Final_genotype)
+geno_colours <- geno_info$`Colour code`
+names(geno_colours) <- geno_info$Genotype
+geno_colours <- geno_colours[order(names(geno_colours))] # sort for legend
+
+# join tree and genotype data
+treedat <- full_join(as_tibble(t_noOutgroup), tree_data_forObject, by = 'label')
+mrca_p1 <- MRCA(treedat, na.omit(treedat$node[treedat$Final_genotype=="4.3.1.1.P1"]))
+rw <- treedat$node[treedat$label=="Rwp1-PK1"][1]
+
+tree_plot <- ggtree(as.treedata(treedat)) + 
+  geom_highlight(node=mrca_p1$node, fill="orange", alpha=.25, extend=5) + 
+  geom_tippoint(aes(color = Final_genotype, shape=rw)) +
+  geom_text(aes(label=rw), hjust=-0.1, size=2.5, vjust=0.1) +
+  scale_colour_manual(values = geno_colours) +
+  labs(color="Genotype") + vexpand(.08, 1) + guides(shape="none")
+
+# heatmaps of AMR determinants
+tree_data_matrix <- data.frame(tree_data_forHeatmap)
+row.names(tree_data_matrix) <- tree_data_matrix[,1]
+tree_data_matrix <- tree_data_matrix[,-1]
+
+year<-as.matrix(tree_data_matrix[,1])
+rownames(year) <- rownames(tree_data_matrix)
+colnames(year)="Year"
+
+# plot tree with heatmaps
+XDR_tree_part1 <- gheatmap(tree_plot, year, width=0.055, colnames_angle=60, colnames_position="top", hjust=0, font.size=2.5, custom_column_labels=c("Year"), colnames_offset_x=-0.2, offset=1) + 
+  scale_fill_manual(values=c(`2015`="yellow", `2016`="orange", `2017`="red", `2019`="brown") ) +
+  labs(fill="Year") + new_scale_fill()
+
+XDR_tree_part2 <- gheatmap(XDR_tree_part1, tree_data_matrix[,-1], width=0.25, colnames_angle=60, colnames_position="top", hjust=0, font.size=2.5, custom_column_labels=c("CTX-M-15", "GyrA-S83F", "qnrS", "MDR", "XDR"), colnames_offset_x=-0.2, offset=2) + 
+  scale_fill_manual(values=c(present="navy", absent="lightgrey") ) +
+  labs(fill="AMR") 
+
+XDR_tree_part2
+
+```
+
+
+## Fig 4: Pathogenwatch tree of Pakistan isolates showing position of Rwp1-PK1
+``` {r, eval=F}
+
+pdf(file="Fig4_Rwp1-PK1_Pakistan_tree.pdf",width=6, height=8)
+XDR_tree_part2
+dev.off()
+
+png(file="Fig4_Rwp1-PK1_Pakistan_tree.png",width=6, height=8, units="in", res=400)
+XDR_tree_part2
+dev.off()
+
+```

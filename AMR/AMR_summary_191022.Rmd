@@ -29,8 +29,6 @@ library(sf)
 library(rvest)
 library(maps)
 
-# trend test
-library(funtimes)
 ```
 
 # Prepare data
@@ -894,3 +892,4 @@ png(paste0("Fig5_azi_mutations_country_",todays_date,".png"), width=7, height=7,
 azi_year / azi_mutations
 dev.off()
 ```
+
