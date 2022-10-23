@@ -35,16 +35,17 @@ tgc_all <- read_csv("../TGC_data_121022.csv")
 
 # 4.3.1.1.P1 tree
 
+## load tree
 ``` {r}
 # tipnames match on 'DisplayName' column
 t <- read.tree("pathogenwatch-styphi-jf64rcfrxdyy-rwp1-pk1-klemm-rasheed-collection-tree.nwk")
-```
-
-``` {r}
 
 t_noOutgroup <- drop.tip(t, "4714STDY6831711") # drop 3.0.1 outlier as it obscures detail
 t_noOutgroup <- drop.tip(t_noOutgroup, "4714STDY6837119") # drop long branch strain 4714STDY6837119
+```
 
+## prepare data
+``` {r}
 tree_data <- tgc_all %>% 
   select(DisplayName, Final_genotype, Year, `blaCTX-M-15_23`, gyrA_S83F, qnrS, MDR, XDR) %>% 
   filter(DisplayName %in% t_noOutgroup$tip.label) %>%
@@ -70,6 +71,10 @@ treedat <- full_join(as_tibble(t_noOutgroup), tree_data_forObject, by = 'label')
 mrca_p1 <- MRCA(treedat, na.omit(treedat$node[treedat$Final_genotype=="4.3.1.1.P1"]))
 rw <- treedat$node[treedat$label=="Rwp1-PK1"][1]
 
+```
+
+## build tree plot
+``` {r}
 tree_plot <- ggtree(as.treedata(treedat)) + 
   geom_highlight(node=mrca_p1$node, fill="orange", alpha=.25, extend=5) + 
   geom_tippoint(aes(color = Final_genotype, shape=rw)) +
@@ -99,7 +104,6 @@ XDR_tree_part2
 
 ```
 
-
 ## Fig 4: Pathogenwatch tree of Pakistan isolates showing position of Rwp1-PK1
 ``` {r, eval=F}
 
@@ -115,13 +119,83 @@ dev.off()
 
 # 2.3.2 tree
 
+## load tree link data
 ``` {r}
-t232 <- read.tree("pathogenwatch-styphi-93d0nftpdmjc-typhi-232-collection-tree.nwk")
+t232 <- read.tree("pathogenwatch-styphi-pvmrvujfye41-typhi-232-plus-ingle-2021-for-outgrouping-collection-tree__2.3.2_ingroup.nwk")
 
 tips232 <- read_csv("pw232_to_ID.csv")
 
+```
+
+## join tree and data
+``` {r}
+
 # get metadata for plotting, col1 = PW_NAME matches the tree
-tgc_232 <- left_join(tips232, tgc_all)
+tgc_232 <- left_join(tips232, tgc_all) %>% 
+  select(PW_NAME, Region, cipIR) %>%
+  mutate(Region = replace(Region, is.na(Region), "Not Provided")) %>%
+  rename(label=PW_NAME)
+
+# join tree and data
+treedat_232 <- full_join(as_tibble(t232), tgc_232, by = c("label"))
+
+# nodes defining regional clades
 
 ```
 
+## build tree plot
+``` {r}
+
+# prepare region variable and colours
+treedat_232 <- treedat_232 %>% 
+  mutate(Region = replace(Region, Region %in% c("Northern Europe", "Southern Europe", "Western Europe"), "Europe")) %>% 
+  mutate(Region = replace(Region, Region %in% c("Southern Asia", "South-eastern Asia", "Western Asia"), "Asia")) %>% 
+  mutate(Region = replace(Region, Region %in% c("Southern Africa", "Middle Africa"), "Other Africa")) %>%
+  mutate(internal_node = replace(node, !is.na(label), NA))
+
+treedat_232$Region <- factor(treedat_232$Region, levels=c("Caribbean", "Central America", "South America", "Northern America", "Western Africa", "Other Africa", "Asia", "Polynesia", "Europe", "Not Provided"))
+  
+region_cols <- c(Caribbean = "gold1", 
+                    `Central America` = "darkorange",
+                    `South America` =  "#d31e25", # red
+                    `Northern America` = "magenta4",
+                    `Western Africa` = "dodgerblue3", 
+                    `Other Africa` = "#369e4b", # green 
+                    Asia = "hotpink1", 
+                    Polynesia = "black", 
+                    Europe = "purple",
+                    `Not Provided` = "grey")
+
+central_america_clade <- 171
+west_africa_clade_1 <- 249
+west_africa_clade_2 <- 254
+west_africa_clade_3 <- 281
+caribbean_clade <- 261
+south_america_clade <- 270
+  
+tree_232_plot <- ggtree(as.treedata(treedat_232)) + 
+  geom_highlight(node=central_america_clade, fill=region_cols["Central America"], alpha=.25, extend=5) + 
+  geom_highlight(node=west_africa_clade_1, fill=region_cols["Western Africa"], alpha=.25, extend=5) + 
+  geom_highlight(node=west_africa_clade_2, fill=region_cols["Western Africa"], alpha=.25, extend=5) + 
+  geom_highlight(node=west_africa_clade_3, fill=region_cols["Western Africa"], alpha=.25, extend=5) + 
+  geom_highlight(node=caribbean_clade, fill=region_cols["Caribbean"], alpha=.25, extend=5) + 
+  geom_highlight(node=south_america_clade, fill=region_cols["South America"], alpha=.25, extend=5) + 
+  geom_tippoint(aes(color = Region, shape=cipIR)) +
+  scale_colour_manual(values = region_cols) +
+  labs(color="Region", shape="CipNS") + vexpand(.08, 1)
+
+tree_232_plot
+```
+
+## Fig S4: Pathogenwatch tree of 2.3.2 isolates
+``` {r, eval=F}
+
+pdf(file="FigS4_232_tree.pdf",width=6, height=6)
+tree_232_plot
+dev.off()
+
+png(file="FigS4_232_tree.png",width=6, height=6, units="in", res=400)
+tree_232_plot
+dev.off()
+
+```
