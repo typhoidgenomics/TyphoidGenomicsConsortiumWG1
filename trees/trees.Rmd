@@ -112,3 +112,16 @@ XDR_tree_part2
 dev.off()
 
 ```
+
+# 2.3.2 tree
+
+``` {r}
+t232 <- read.tree("pathogenwatch-styphi-93d0nftpdmjc-typhi-232-collection-tree.nwk")
+
+tips232 <- read_csv("pw232_to_ID.csv")
+
+# get metadata for plotting, col1 = PW_NAME matches the tree
+tgc_232 <- left_join(tips232, tgc_all)
+
+```
+
