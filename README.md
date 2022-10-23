@@ -20,9 +20,11 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 * `genotypes_121022.html` = knitR output of Rmd file, including all figures and numbers included in text
 
-* figure files (PNG and PDF format)
+* `UN_region_coords.csv` = GPS coordinates for world regions, used to generate world map of genotypes
 
-* supplementary table files (CSV format)
+* figure files (PNG and PDF format; output from executing Rmd file)
+
+* supplementary table files (CSV format; output from executing Rmd file)
 
 ## AMR analysis
 
@@ -32,6 +34,21 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 * `AMR_summary_191022.html` = knitR output of Rmd file, including all figures and numbers included in text
 
-* figure files (PNG and PDF format)
+* figure files (PNG and PDF format; output from executing Rmd file)
 
-* supplementary table files (CSV format)
+* supplementary table files (CSV format; output from executing Rmd file)
+
+## Plotting phylogenetic trees
+
+`/trees` directory
+
+* `trees.Rmd` = R markdown file for all analysis, generating tables and figures
+
+* `trees.html` = knitR output of Rmd file, including output figures
+
+* tree files (`.nwk` format) = neighbour-joining core genome trees downloaded from Pathogenwatch
+
+* `pw232_to_ID.csv` = file mapping tip names in 2.3.2 tree file to identifiers in the main consortium metadata file
+
+* figure files (PNG and PDF format; output from executing Rmd file)
+
