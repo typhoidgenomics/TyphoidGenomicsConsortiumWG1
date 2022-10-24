@@ -559,7 +559,7 @@ geno_colours2["4.3.1.2.EA3"] = "#94165f"
 ## read in GPS data
 ``` {r}
 # read gps coordinates
-gps <- read.csv("../UN_region_coords.csv")%>%
+gps <- read.csv("UN_region_coords.csv")%>%
   select(Region, latitude, longitude)
 ```
 
