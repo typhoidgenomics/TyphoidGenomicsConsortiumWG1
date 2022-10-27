@@ -1,0 +1,895 @@
+---
+title: "Data analyses for Global Typhoid Genomics Consortium Paper - Working Group 1 (Descriptive Stats - AMR)"
+author: "Kat AMR"
+date: "19/10/2022"
+output:
+  html_document:
+    toc: true
+#    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = getwd())
+
+# Data wrangling
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+
+# Plotting (general)
+library(ggplot2)
+library(RColorBrewer)
+library(patchwork)
+library(pals) # so we can use longer colour palette "alphabet" for south asia lab plot
+
+# Plotting (maps)
+library(sf)
+library(rvest)
+library(maps)
+
+```
+
+# Prepare data
+
+## Get date
+``` {r}
+todays_date <- str_replace_all(Sys.Date(),"-","")
+```
+
+## Load data
+``` {r load_data}
+
+tgc_all <- read_csv("../TGC_data_271022.csv") %>% 
+  filter(exclude_assembly != TRUE) %>% 
+  mutate(aziR=replace(aziR, ereA==1, T))
+
+```
+
+## define representative subsets for analysis
+``` {r}
+# copied from genotype code
+
+tgc_all <- tgc_all %>% 
+  mutate(IncHI1=grepl("IncHI1",`Inc Types`)) %>% 
+  filter(exclude_assembly != TRUE)
+
+
+# surveillance-ready samples only
+
+tgc_meta <- tgc_all %>%
+  filter(assumedAcute == T, 
+         untargetedSurveillance == T,
+         Country_Origin != "Not Provided")
+
+nrow(tgc_meta)
+
+# surveillance-ready samples, known years, 2010 onwards
+tgc_from2010 <- tgc_all %>%
+  filter(assumedAcute == T, 
+         untargetedSurveillance == T,
+         Country_Origin != "Not Provided",
+         Year >=2010)
+
+nrow(tgc_from2010)
+
+nrow(tgc_from2010)/nrow(tgc_meta)
+
+```
+
+## summarise AMR data by country and region
+``` {r tabulate_AMR}
+# clean up AMR data (for surveillance-ready samples)
+res_data <- tgc_meta %>%
+  mutate(cefR = as.numeric(CEP), 
+         XDR = if_else(XDR == T, 1, 0), 
+         MDR = if_else(MDR ==T, 1, 0), 
+         cipNS = if_else(cipNS == T, 1, 0), 
+         cipR = if_else(cipR == T, 1, 0), 
+         aziR = if_else(aziR == T, 1, 0)) %>% #convert PW AMR calls to numeric values
+  select(Country_Origin, Region, Year, cefR, cipNS, cipR, MDR, XDR, aziR, IncHI1)
+
+# map object has "UK", "Vietnam", changes ours to match this string format
+res_data$Country_Origin <- replace(res_data$Country_Origin, res_data$Country_Origin=="United Kingdom", "UK")
+res_data$Country_Origin <- replace(res_data$Country_Origin, res_data$Country_Origin=="Viet Nam", "Vietnam")
+
+# tabulate resistance freqs per country, for 2010 onwards
+res_freq_table <- res_data %>%
+  filter(Year >= 2010) %>% # restrict to last 10 years
+  group_by(Country_Origin)%>%
+  summarize(n=n(),
+            sumMDR= sum(MDR),
+            MDR= round(sumMDR/n*100, digits =0),
+            sumXDR= sum(XDR),
+            XDR= round(sumXDR/n*100, digits = 0),
+            sumcipNS = sum(cipNS),
+            cipNS = round(sumcipNS/n*100, digits = 0),
+            sumcipR = sum(cipR),
+            cipR = round(sumcipR/n*100, digits = 0),
+            sumcefR = sum(cefR),
+            cefR = round(sumcefR/n*100, digits = 0),
+            sumaziR = sum(aziR),
+            aziR = round(sumaziR/n*100, digits =0),
+            MDR_se = sqrt((sumMDR/n*(1-sumMDR/n))/n),
+            XDR_se = sqrt((sumXDR/n*(1-sumXDR/n))/n),
+            cipNS_se = sqrt((sumcipNS/n*(1-sumcipNS/n))/n),
+            cipR_se = sqrt((sumcipR/n*(1-sumcipR/n))/n),
+            cefR_se = sqrt((sumcefR/n*(1-sumcefR/n))/n),
+            aziR_se = sqrt((sumaziR/n*(1-sumaziR/n))/n)
+            ) %>% 
+  unique()
+
+# tabulate resistance freqs per region, for 2010 onwards
+res_freq_table_region <- res_data %>%
+  filter(Year >= 2010) %>% # restrict to last 10 years
+  group_by(Region)%>%
+  summarize(n=n(),
+            sumMDR= sum(MDR),
+            MDR= round(sumMDR/n*100, digits =0),
+            sumXDR= sum(XDR),
+            XDR= round(sumXDR/n*100, digits = 0),
+            sumcipNS = sum(cipNS),
+            cipNS = round(sumcipNS/n*100, digits = 0),
+            sumcipR = sum(cipR),
+            cipR = round(sumcipR/n*100, digits = 0),
+            sumcefR = sum(cefR),
+            cefR = round(sumcefR/n*100, digits = 0),
+            sumaziR = sum(aziR),
+            aziR = round(sumaziR/n*100, digits =0),
+            MDR_se = sqrt((sumMDR/n*(1-sumMDR/n))/n),
+            XDR_se = sqrt((sumXDR/n*(1-sumXDR/n))/n),
+            cipNS_se = sqrt((sumcipNS/n*(1-sumcipNS/n))/n),
+            cipR_se = sqrt((sumcipR/n*(1-sumcipR/n))/n),
+            cefR_se = sqrt((sumcefR/n*(1-sumcefR/n))/n),
+            aziR_se = sqrt((sumaziR/n*(1-sumaziR/n))/n)
+            ) %>% 
+  unique()
+
+```
+
+# National & regional AMR prevalence rates for countries with N≥50, 2010-2020
+
+## prepare national AMR rates, 2010-2020
+``` {r traffic_light}
+
+traffic_colours <- c("#c2d1f0",  "#ffdb4d","orange", "#e63900", "#9a2600") # light blue rather than green
+
+#traffic_colours <- rev(c("#db4325", "#eda247", "#e6e1bc", "#57c4ad","#006164")) # colourblind friendly palette
+
+#traffic_colours <- rev(c("#9a2600", "#db4325", "#eda247", "#57c4ad","#006164")) # colourblind friendly palette, modified to accommodate white text overlaid
+
+
+# check countries to include
+countries_n50_2010 <- res_freq_table$Country_Origin[res_freq_table$n>=50]
+
+# reorder these into regions (exclude USA and UK):
+countries_n50_2010 <- c("Chile", "Mexico", "Samoa", "Philippines", "Indonesia", "Cambodia", "Bangladesh", "India", "Nepal", "Pakistan", "Kenya", "Malawi", "South Africa", "Ghana", "Nigeria")
+
+# make data frame for plotting, for selected countries with sufficient data (min is Indonesia, n=65)
+res_freq_groups <- res_freq_table %>%
+  filter(Country_Origin %in% countries_n50_2010) %>%
+  select(Country_Origin, MDR, XDR, cipNS, cipR, cefR, aziR) %>%
+  melt(id.vars = c("Country_Origin"))%>%
+  mutate(Groups = if_else(value ==0, "0", if_else(value> 0 & value <2, ">0 and <2%", if_else(value>=2 & value <10, "2-10%", if_else(value>=10 & value <50, "10-50%",">50%")))))
+
+# order the traffic levels
+res_freq_groups$Groups <- factor(res_freq_groups$Groups, levels=c("0", ">0 and <2%", "2-10%", "10-50%", ">50%"))
+
+# order the countries by region
+res_freq_groups$Country_Origin <- factor(res_freq_groups$Country_Origin, levels=countries_n50_2010)
+
+```
+
+## Table S8: write AMR freqs for countries with N≥50, 2010-2020
+``` {r}
+res_freq_country_toPrint <- res_freq_table %>%
+  filter(Country_Origin %in% countries_n50_2010) %>%
+  mutate(MDR_lower = round((sumMDR/n - 1.96*MDR_se)*100, digits=0),
+         MDR_upper = round((sumMDR/n + 1.96*MDR_se)*100, digits=0),
+         XDR_lower = round((sumXDR/n - 1.96*XDR_se)*100, digits=0),
+         XDR_upper = round((sumXDR/n + 1.96*XDR_se)*100, digits=0),
+         cipNS_lower = round((sumcipNS/n - 1.96*cipNS_se)*100, digits=0),
+         cipNS_upper = round((sumcipNS/n + 1.96*cipNS_se)*100, digits=0),
+         cipR_lower = round((sumcipR/n - 1.96*cipR_se)*100, digits=0),
+         cipR_upper = round((sumcipR/n + 1.96*cipR_se)*100, digits=0),
+         cefR_lower = round((sumcefR/n - 1.96*cefR_se)*100, digits=0),
+         cefR_upper = round((sumcefR/n + 1.96*cefR_se)*100, digits=0),
+         aziR_lower = round((sumaziR/n - 1.96*aziR_se)*100, digits=0),
+         aziR_upper = round((sumaziR/n + 1.96*aziR_se)*100, digits=0)
+         ) %>%
+  mutate(MDR_lower=replace(MDR_lower, MDR_lower<0, 0),
+         XDR_lower=replace(XDR_lower, XDR_lower<0, 0),
+         cipNS_lower=replace(cipNS_lower, cipNS_lower<0, 0),
+         cipR_lower=replace(cipR_lower, cipR_lower<0, 0),
+         cefR_lower=replace(cefR_lower, cefR_lower<0, 0),
+         aziR_lower=replace(aziR_lower, aziR_lower<0, 0),
+         MDR_upper=replace(MDR_upper, MDR_upper>100, 100),
+         XDR_upper=replace(XDR_upper, XDR_upper>100, 100),
+         cipNS_upper=replace(cipNS_upper, cipNS_upper>100, 100),
+         cipR_upper=replace(cipR_upper, cipR_upper>100, 100),
+         cefR_upper=replace(cefR_upper, cefR_upper>100, 100),
+         aziR_upper=replace(aziR_upper, aziR_upper>100, 100)
+         ) %>%
+  select(-sumMDR, -sumXDR, -sumcefR,-sumcipNS, -sumcipR, -sumaziR, -MDR_se, -XDR_se, -cipNS_se, -cipR_se, -cefR_se, -aziR_se)
+
+write.csv(res_freq_country_toPrint, file=paste0("SuppTable8_AMR_freqs_by_Country_2010-2020_",todays_date,".csv"), row.names=F)
+```
+
+## Fig 2: country-level traffic light plot
+``` {r make_trafficlight_plot}
+traffic_light  <- ggplot(res_freq_groups, aes(y= Country_Origin, x = variable))+
+  geom_point(aes(color=Groups), size=12)+
+  geom_text(aes(label = paste(value, "%", sep = "")), color = "white", fontface = "bold")+
+  scale_color_manual(values = traffic_colours, breaks = levels(res_freq_groups$Groups))+
+  theme_bw()+
+  ylab("")+
+  xlab("")+
+  scale_x_discrete(position = "top")+
+  theme(axis.text = element_text(size =12),
+        legend.title = element_text(face = "bold"))+
+  labs(color = "% Resistant")
+
+traffic_light
+
+```
+
+## make figs of traffic light AMR country plot
+``` {r traffic_light_fig, eval=T}
+pdf(paste0("Fig2_trafficLight_AMR_",todays_date,".pdf"), width=6, height=6.5)
+traffic_light
+dev.off()
+
+png(paste0("Fig2_trafficLight_AMR_",todays_date,".png"), width=6, height=6.5, units="in", res=400)
+traffic_light
+dev.off()
+```
+
+## Fig S5: regional traffic light plot
+``` {r region_trafficlight_plot}
+# make data frame for plotting, for regions
+res_freq_groups_region <- res_freq_table_region %>%
+  select(-n, -sumMDR, -sumXDR, -sumcefR,-sumcipNS, -sumcipR, -sumaziR, -MDR_se, -XDR_se, -cipNS_se, -cipR_se, -cefR_se, -aziR_se) %>%
+  melt(id.vars = c("Region"))%>%
+  mutate(Groups = if_else(value ==0, "0", if_else(value> 0 & value <2, ">0 and <2%", if_else(value>=2 & value <10, "2-10%", if_else(value>=10 & value <50, "10-50%",">50%")))))
+
+# order the traffic levels
+res_freq_groups_region$Groups <- factor(res_freq_groups_region$Groups, levels=c("0", ">0 and <2%", "2-10%", "10-50%", ">50%"))
+
+# order the region labels alphabetically
+res_freq_groups_region$Region <- factor(res_freq_groups_region$Region, levels=rev(unique(res_freq_groups_region$Region)))
+
+# order region labels by continent
+res_freq_groups_region$Region <- factor(res_freq_groups_region$Region, levels=rev(c("Australia and New Zealand", "Melanesia", "South-eastern Asia", "Eastern Asia", "Southern Asia", "Western Asia", "Eastern Europe", "Northern Europe","Western Europe", "Southern Europe", "Northern Africa", "Middle Africa", "Eastern Africa","Southern Africa", "Western Africa", "South America", "Caribbean", "Central America", "Northern America", "Polynesia", "Micronesia")))
+
+region_traffic_light  <- ggplot(res_freq_groups_region, aes(y= Region, x = variable))+
+  geom_point(aes(color=Groups), size=12)+
+  geom_text(aes(label = paste(value, "%", sep = "")), color = "white", fontface = "bold")+
+  scale_color_manual(values = traffic_colours, breaks = levels(res_freq_groups_region$Groups))+
+  theme_bw()+
+  ylab("")+
+  xlab("")+
+  scale_x_discrete(position = "top")+
+  theme(axis.text = element_text(size =12),
+        legend.title = element_text(face = "bold"))+
+  labs(color = "% Resistant")
+
+region_traffic_light
+
+```
+
+## make figures of traffic light AMR regional plot
+``` {r traffic_light_regions_pdf, eval=T}
+pdf(paste0("SuppFig5_trafficLight_AMR_regions_",todays_date,".pdf"), height=9, width=7)
+region_traffic_light
+dev.off()
+
+png(paste0("SuppFig5_trafficLight_AMR_regions_",todays_date,".png"), height=9, width=7, units="in", res=400)
+region_traffic_light
+dev.off()
+```
+
+## Table 7: write regional AMR freqs, 2010-2020
+``` {r}
+res_freq_region_toPrint <- res_freq_table_region %>%
+  mutate(MDR_lower = round((sumMDR/n - 1.96*MDR_se)*100, digits=0),
+         MDR_upper = round((sumMDR/n + 1.96*MDR_se)*100, digits=0),
+         XDR_lower = round((sumXDR/n - 1.96*XDR_se)*100, digits=0),
+         XDR_upper = round((sumXDR/n + 1.96*XDR_se)*100, digits=0),
+         cipNS_lower = round((sumcipNS/n - 1.96*cipNS_se)*100, digits=0),
+         cipNS_upper = round((sumcipNS/n + 1.96*cipNS_se)*100, digits=0),
+         cipR_lower = round((sumcipR/n - 1.96*cipR_se)*100, digits=0),
+         cipR_upper = round((sumcipR/n + 1.96*cipR_se)*100, digits=0),
+         cefR_lower = round((sumcefR/n - 1.96*cefR_se)*100, digits=0),
+         cefR_upper = round((sumcefR/n + 1.96*cefR_se)*100, digits=0),
+         aziR_lower = round((sumaziR/n - 1.96*aziR_se)*100, digits=0),
+         aziR_upper = round((sumaziR/n + 1.96*aziR_se)*100, digits=0)
+         ) %>%
+  mutate(MDR_lower=replace(MDR_lower, MDR_lower<0, 0),
+         XDR_lower=replace(XDR_lower, XDR_lower<0, 0),
+         cipNS_lower=replace(cipNS_lower, cipNS_lower<0, 0),
+         cipR_lower=replace(cipR_lower, cipR_lower<0, 0),
+         cefR_lower=replace(cefR_lower, cefR_lower<0, 0),
+         aziR_lower=replace(aziR_lower, aziR_lower<0, 0),
+         MDR_upper=replace(MDR_upper, MDR_upper>100, 100),
+         XDR_upper=replace(XDR_upper, XDR_upper>100, 100),
+         cipNS_upper=replace(cipNS_upper, cipNS_upper>100, 100),
+         cipR_upper=replace(cipR_upper, cipR_upper>100, 100),
+         cefR_upper=replace(cefR_upper, cefR_upper>100, 100),
+         aziR_upper=replace(aziR_upper, aziR_upper>100, 100)
+         ) %>%
+  select(-sumMDR, -sumXDR, -sumcefR,-sumcipNS, -sumcipR, -sumaziR, -MDR_se, -XDR_se, -cipNS_se, -cipR_se, -cefR_se, -aziR_se)
+
+write.csv(res_freq_region_toPrint, file=paste0("SuppTable7_AMR_freqs_by_Region_2010-2020_",todays_date,".csv"), row.names=F)
+```
+
+# Maps of national AMR rates
+## make map object
+```{r make_map}
+
+# filter to those with N≥20
+typhi_res_2010_N20 <- res_freq_table %>% filter(n>=20)
+
+# join with map data
+typhi_percent_AMR_map_2010_N20 <- map_data('world') %>%
+  group_by(region) %>%
+  left_join(typhi_res_2010_N20, by = c('region' = 'Country_Origin')) %>% 
+  as.data.frame() %>% # melt so we can facet
+  melt(id.vars=c("long", "lat", "group", "order", "region", "subregion"),
+      variable.name="AMR", 
+      value.name="prevalence",  
+      measure.vars=c("MDR","XDR","cipNS","cipR", "cefR", "aziR"), 
+      na.rm=F)
+
+typhi_AMR_map_2010_N20 <- typhi_percent_AMR_map_2010_N20 %>%
+  ggplot(aes( x = long, y = lat, group=group)) +
+  geom_polygon(aes(fill = as.numeric(prevalence))) +
+  facet_wrap(~AMR, ncol=2) +
+  guides(fill = guide_legend(reverse = F, title="% Res")) + 
+  scale_fill_gradientn(colours = traffic_colours, values = c(0,0.02,0.10,0.50,1), breaks = c(0,2,10,50,100), limits=c(0,100)) + 
+  theme_void() + 
+  theme(legend.position = "right", strip.text=element_text(size=10, face="bold"))
+
+typhi_AMR_map_2010_N20
+
+```
+
+## Fig S6: fig with 6 map panels showing national AMR prevalence
+``` {r plot_set, eval=T}
+
+pdf(paste0("SuppFig6_maps_AMR_",todays_date,".pdf"), width=7, height=7)
+typhi_AMR_map_2010_N20
+dev.off()
+
+png(paste0("SuppFig6_maps_AMR_",todays_date,".png"), width=7, height=7, units="in", res=400)
+typhi_AMR_map_2010_N20
+dev.off()
+
+```
+
+# National annual AMR frequencies
+## calculate annual AMR frequencies per country
+``` {r get_annual_AMR_freq}
+
+res_freq_annual_table <- res_data %>%
+  filter(Year >= 2000) %>% # restrict to last 20 years
+  mutate(MDR_IncHI1 = ifelse(IncHI1, MDR, 0)) %>%
+  group_by(Country_Origin, Year) %>%
+  summarize(n=n(),
+            sumMDR= sum(MDR),
+            MDR= round(sumMDR/n*100, digits =0),
+            sumXDR= sum(XDR),
+            XDR= round(sumXDR/n*100, digits = 0),
+            sumcipNS = sum(cipNS),
+            cipNS = round(sumcipNS/n*100, digits = 0),
+            sumcipR = sum(cipR),
+            cipR = round(sumcipR/n*100, digits = 0),
+            sumcefR = sum(cefR),
+            cefR = round(sumcefR/n*100, digits = 0),
+            sumaziR = sum(aziR),
+            aziR = round(sumaziR/n*100, digits =0),
+            MDR_se = sqrt((sumMDR/n*(1-sumMDR/n))/n),
+            XDR_se = sqrt((sumXDR/n*(1-sumXDR/n))/n),
+            cipNS_se = sqrt((sumcipNS/n*(1-sumcipNS/n))/n),
+            cipR_se = sqrt((sumcipR/n*(1-sumcipR/n))/n),
+            cefR_se = sqrt((sumcefR/n*(1-sumcefR/n))/n),
+            aziR_se = sqrt((sumaziR/n*(1-sumaziR/n))/n),
+            sumMDR_IncHI1 = sum(MDR_IncHI1),
+            `IncHI1 amongst MDR` = round(sumMDR_IncHI1/sumMDR*100, digits=0)) %>% 
+  unique()
+
+# countries with at least 3 years with N≥10
+countries_3yr_N10 <- res_freq_annual_table %>% filter(n>=10) %>% group_by(Country_Origin) %>% summarize(years_10=n()) %>% filter(years_10>=3)
+
+# note this includes the traffic light countries (N≥50 in 2010-2020) plus Laos, USA, UK; but without Mexico and Ghana
+countries_3yr_N10$Country_Origin[!countries_3yr_N10$Country_Origin %in% countries_n50_2010]
+countries_n50_2010[!(countries_n50_2010 %in% countries_3yr_N10$Country_Origin)]
+
+# reorder these into regions:
+res_freq_annual_table$Country_Origin <- factor(res_freq_annual_table$Country_Origin, levels=c("UK", "USA","Chile", "Samoa", "Philippines", "Indonesia", "Cambodia", "Laos", "Bangladesh", "India", "Nepal", "Pakistan", "Kenya", "Malawi", "South Africa", "Nigeria"))
+
+```
+
+## Table S8: annual and aggregated AMR rates per country
+``` {r }
+res_freq_table <- res_freq_table %>% mutate(Year="all")
+
+res_freq_annual_table$Year <- as.character(res_freq_annual_table$Year)
+
+res_freq_annual_table_toPrint <- res_freq_annual_table %>% 
+  filter(Country_Origin %in% countries_3yr_N10$Country_Origin) %>% 
+  bind_rows(res_freq_table) %>%
+  mutate(MDR_lower=MDR/100 - 1.96*MDR_se,
+         MDR_upper=MDR/100 + 1.96*MDR_se,
+         XDR_lower=XDR/100 - 1.96*XDR_se,
+         XDR_upper=XDR/100 + 1.96*XDR_se,
+         cipNS_lower=cipNS/100 - 1.96*cipNS_se,
+         cipNS_upper=cipNS/100 + 1.96*cipNS_se,
+         cipR_lower=cipR/100 - 1.96*cipR_se,
+         cipR_upper=cipR/100 + 1.96*cipR_se,
+         cefR_lower=cefR/100 - 1.96*cefR_se,
+         cefR_upper=cefR/100 + 1.96*cefR_se,
+         aziR_lower=aziR/100 - 1.96*aziR_se,
+         aziR_upper=aziR/100 + 1.96*aziR_se) %>%
+  select(-c(MDR_se, XDR_se, cipNS_se, cipR_se, cefR_se, aziR_se))
+
+write.csv(res_freq_annual_table_toPrint, file=paste0("SuppTable8_AMR_freqs_selectCountries_2000-2020_",todays_date,".csv"), row.names=F)
+
+```
+
+## Fig S8: heatmap showing annual resistance data - facet plot
+``` {r}
+
+res_freq_annual_table$Year <- as.numeric(as.character(res_freq_annual_table$Year))
+res_freq_annual_table$MDR <- as.numeric(as.character(res_freq_annual_table$MDR))
+
+# melted way, with legend
+annual_res_heatmap <- res_freq_annual_table %>% 
+    filter(Country_Origin %in% countries_3yr_N10$Country_Origin) %>% # only countries with ≥3 yrs with N≥10 data points
+    filter(!(Country_Origin %in% c("UK","USA"))) %>% # exclude non-endemic
+    filter(n>=5) %>% # plot only those years with sufficient data
+    as.data.frame() %>%
+    melt(id.vars=c("Country_Origin","Year"), variable.name="AMR") %>%
+    filter(AMR %in% c("MDR","XDR","cipR","cipNS", "cefR", "aziR")) %>%
+  ggplot(aes(x = Year, y = Country_Origin, fill = value)) +
+  geom_tile() +
+  facet_wrap(~AMR, ncol=2) +
+  scale_fill_gradientn(colours = traffic_colours, values = c(0,0.02,0.10,0.50,1), breaks = c(0,2,10,50,100), limits=c(0,100), guide="legend", labels=levels(res_freq_groups$Groups)) +
+  theme_bw() +
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 10, colour = "black"), axis.title.x = element_text(size = 10, colour = "black"), legend.position = "right", axis.text.y = element_text(size =12, face = "bold")) + 
+  ylab("") +
+  xlab("") +
+  labs(fill = "% Res")
+
+annual_res_heatmap
+
+```
+
+## Fig S8: annual AMR heatmaps
+``` {r plot_heatmaps, eval=T}
+
+pdf(paste0("SuppFig8_AMR_annual_heatmaps_",todays_date,".pdf"), width=9, height=10)
+annual_res_heatmap
+dev.off()
+
+png(paste0("SuppFig8_AMR_annual_heatmaps_",todays_date,".png"), width=9, height=10, units="in", res=400)
+annual_res_heatmap
+dev.off()
+```
+
+## line plots of annual resistance - facet by country
+``` {r annual_res_ribbon}
+
+# melted way, with legend
+annual_res_lineplot <- res_freq_annual_table %>% 
+    filter(Country_Origin %in% countries_3yr_N10$Country_Origin) %>% # only countries with ≥3 yrs with N≥10 data points
+    filter(n>=5) %>% # plot only those years with sufficient data
+    as.data.frame() %>%
+    melt(id.vars=c("Country_Origin","Year"), variable.name="AMR") %>%
+    filter(AMR %in% c("MDR","XDR","cipR","cipNS")) %>%
+  ggplot(aes(Year, value, color=AMR)) +    
+  geom_line( size = 1, alpha=0.5, aes(group=AMR)) +  
+  geom_point( size = 1, alpha=0.5 ) +
+  facet_wrap(. ~ Country_Origin) + theme_bw() +
+  scale_color_manual(values=c("red","blue","orange","black")) + 
+  ylab("Resistance (%)") +
+  labs(color="Resistance")+ 
+  theme(strip.background = element_rect(fill ="#f0f0f5"), strip.text=element_text(size=8, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 8, colour = "black"), legend.title = element_text(size=8, face="bold"), axis.title = element_text(size=8))
+
+annual_res_lineplot
+```
+
+## Fig 3: Print line plots for annual AMR
+``` {r AMR_lineplot, eval=T}
+pdf(paste0("Fig3_AMR_annual_lineplots_",todays_date,".pdf"), width=6, height=5)
+annual_res_lineplot
+dev.off()
+
+png(paste0("Fig3_AMR_annual_lineplots_",todays_date,".png"), width=6, height=5, units="in", res=400)
+annual_res_lineplot
+dev.off()
+```
+
+
+## numbers for text
+``` {r}
+res_freq_annual_table_toPrint %>% filter(Country_Origin=="Bangladesh" & n>=10) %>%
+  select(Year, cipNS, n, sumcipNS, cipNS_lower, cipNS_upper)
+```
+
+# Determinants within genotypes
+``` {r}
+country_geno_cipNSdets <- tgc_from2010 %>% 
+  group_by(Country_Origin, Final_genotype) %>% 
+  select(Country_Origin, Final_genotype, starts_with(c("gyrA","parC","qnr"))) %>%
+  mutate(wt=if_else(if_any(starts_with(c("gyrA","parC","qnr")), ~. >0), 0, 1)) %>%
+  melt(id.vars=c("Country_Origin","Final_genotype")) %>% 
+  group_by(Country_Origin, Final_genotype, variable) %>% 
+  summarize(N=n(), 
+            x=sum(value), 
+            p=x/N,
+            .groups = "keep"
+            )
+```
+
+## India and Bangladesh Cip determinant details
+
+``` {r}
+cip_determinants_IndiaBang <- country_geno_cipNSdets %>% 
+  filter(x>0) %>%
+  filter(Country_Origin %in% c("India", "Bangladesh")) %>%
+  ggplot(aes(y=Final_genotype, x=variable)) + 
+  geom_point(aes(color=p, size=x)) +
+  scale_color_gradient(low="lightblue", high="#cc0000", guide="colourbar", na.value = "grey50") + 
+  facet_wrap(. ~ Country_Origin) + 
+  ylab("Genotype") +
+  xlab("Cip determinant") +
+  labs(color="Frequency of determinant within genotype:", size="N:") + 
+  theme(strip.background = element_blank(), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 8, colour = "black"), axis.text.y = element_text(size = 7, colour = "black"), legend.title = element_text(size=10, face="bold"), legend.position = "bottom")
+
+cip_determinants_IndiaBang
+
+# country rates
+country_qrdr_rates <- tgc_from2010 %>% 
+  group_by(Country_Origin) %>% 
+  select(Country_Origin,starts_with("gyrA"), starts_with("parC"), starts_with("qnr")) %>% 
+  melt(id.vars=c("Country_Origin")) %>% 
+  group_by(Country_Origin, variable) %>% 
+  summarize(N=n(), 
+            x=sum(value), 
+            p=x/N,
+            .groups = "keep"
+  ) 
+```
+
+## Nigeria & Kenya details for Cip determinants
+
+``` {r}
+cip_determinants_KenyaNigeria <- country_geno_cipNSdets %>% 
+  filter(x>0) %>%
+  filter(Country_Origin %in% c("Kenya", "Nigeria")) %>%
+  ggplot(aes(y=Final_genotype, x=variable)) + 
+  geom_point(aes(color=p, size=x)) +
+  scale_color_gradient(low="lightblue", high="#cc0000", guide="colourbar", na.value = "grey50") +
+  facet_wrap(. ~ Country_Origin) + 
+  ylab("Genotype") +
+  xlab("Cip determinant") +
+  labs(color="Frequency of determinant within genotype:", size="N:") + 
+  theme(strip.background = element_blank(), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 8, colour = "black"), axis.text.y = element_text(size = 7, colour = "black"), legend.title = element_text(size=10, face="bold"), legend.position = "bottom")
+
+cip_determinants_KenyaNigeria
+
+```
+
+## Fig S9: cip determinants by genotype for India/Bangladesh and Nigeria/Kenya
+``` {r cipGenes_geno_country_IBNK, eval=T}
+pdf(paste0("SuppFig9_cipDet_byGeno_India_Bang_Kenya_Nigeria_",todays_date,".pdf"), width=8, height=10)
+cip_determinants_IndiaBang + cip_determinants_KenyaNigeria + plot_layout(nrow=2, heights=c(4,2))
+dev.off()
+
+png(paste0("SuppFig9_cipDet_byGeno_India_Bang_Kenya_Nigeria_",todays_date,".png"), width=8, height=10, units="in", res=400)
+cip_determinants_IndiaBang + cip_determinants_KenyaNigeria + plot_layout(nrow=2, heights=c(4,2))
+dev.off()
+```
+
+## Fig S10: cipR genotypes vs country
+``` {r}
+cip_mut <- tgc_from2010 %>% 
+  select(TGC_sangerlane, starts_with("gyr"), starts_with("par"), starts_with("qnr")) 
+cip_mut <- data.frame(cip_mut)
+w <- which(cip_mut=="1",arr.ind=TRUE)
+cip_mut[w] <- names(cip_mut)[w[,"col"]]
+cip_mut <- tibble(cip_mut) %>% 
+  unite(cip, gyrA_D87A:qnrS, sep=" ") %>%
+  mutate(cip=gsub("0 ","",cip))%>%
+  mutate(cip=gsub(" 0","",cip))
+
+tgc_from2010_cipMut <- tgc_from2010 %>% left_join(cip_mut)
+
+tgc_from2010_cipMut %>% filter(cipR) %>% group_by(Final_genotype, cip) %>% summarise(n=n())
+
+tgc_from2010_cipMut %>% filter(cipR) %>% group_by(Final_genotype, cip, Country_Origin) %>% summarise(n=n())
+
+tgc_from2010_cipMut <- tgc_from2010_cipMut %>%
+  filter(cipR) %>% 
+  select(TGC_sangerlane, Final_genotype, cip, Country_Origin) %>% 
+  unite(cip_genotype, Final_genotype:cip, sep=" :: ") %>% 
+  group_by(Country_Origin, cip_genotype) %>% 
+  summarise(n=n()) 
+    
+cipR_genotypes_country <- tgc_from2010_cipMut %>% 
+  ggplot(aes(y=cip_genotype, x=Country_Origin, fill=n)) +
+  geom_tile() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10, colour = "black")) + 
+  labs(x="", y="") + 
+    geom_text(aes(label = round(n, 1)), size=3) +
+    scale_fill_gradient(low = "white", high = "red") 
+
+cipR_genotypes_country
+```
+
+``` {r cipR_country, eval=T}
+pdf(paste0("SuppFig10_cipGenotypes_vs_Country_",todays_date,".pdf"), width=8, height=7)
+cipR_genotypes_country
+dev.off()
+
+png(paste0("SuppFig10_cipGenotypes_vs_Country_",todays_date,".png"), width=8, height=7, units="in", res=400)
+cipR_genotypes_country
+dev.off()
+```
+
+## numbers in text: cip trends
+
+``` {r}
+# CipNS in South Asia
+res_freq_annual_table %>% filter(Country_Origin=="Bangladesh") %>% select(Year, n, cipNS)
+res_freq_annual_table %>% filter(Country_Origin=="India") %>% select(Year, n, cipNS)
+res_freq_annual_table %>% filter(Country_Origin=="Nepal") %>% select(Year, n, cipNS)
+res_freq_annual_table %>% filter(Country_Origin=="Pakistan") %>% select(Year, n, cipNS)
+
+country_qrdr_rates %>% filter(Country_Origin %in% c("India", "Bangladesh", "Nepal", "Pakistan"))
+
+# number of cipNS genotype backgrounds in India
+tgc_from2010 %>% filter(Country_Origin =="India" & cipNS) %>% group_by(Final_genotype) %>% summarise(n=n()) %>% nrow()
+
+# number of cipNS genotype backgrounds in Bangladesh
+tgc_from2010 %>% filter(Country_Origin =="Bangladesh" & cipNS) %>% group_by(Final_genotype) %>% summarise(n=n()) %>% nrow()
+
+# number of cipNS genotype backgrounds in Nepal
+tgc_from2010 %>% filter(Country_Origin =="Nepal" & cipNS) %>% group_by(Final_genotype) %>% summarise(n=n()) %>% nrow()
+
+# number of cipNS genotype backgrounds in Pakistan
+tgc_from2010 %>% filter(Country_Origin =="Pakistan" & cipNS) %>% group_by(Final_genotype) %>% summarise(n=n()) %>% nrow()
+
+# susceptible 3.3.2 in Nepal
+tgc_from2010 %>% filter(Country_Origin=="Nepal") %>% mutate(cipS_332 = if_else(Final_genotype=="3.3.2" & !cipNS, T, F)) %>% group_by(Year, cipS_332) %>% summarise(n=n()) %>% mutate(p=n/sum(n)) %>% filter(cipS_332)
+
+tgc_from2010 %>% filter(Country_Origin=="Nepal") %>% mutate(cipS_332 = if_else(Final_genotype=="3.3.2" & !cipNS, T, F)) %>% group_by(Year, cipS_332) %>% summarise(n=n()) %>% mutate(p=n/sum(n)) %>% filter(cipS_332 & Year<2019) %>% ungroup() %>% select(p) %>% colMeans()
+
+# CipNS in Africa
+res_freq_annual_table %>% filter(Country_Origin=="Kenya") %>% select(Year, n, cipNS)
+res_freq_annual_table %>% filter(Country_Origin=="Nigeria") %>% select(Year, n, cipNS)
+
+kenya_annual <- res_freq_annual_table %>% filter(Country_Origin=="Kenya") %>% filter(n>=10)
+prop.trend.test(kenya_annual$sumcipNS, kenya_annual$n)
+prop.trend.test(kenya_annual$sumMDR, kenya_annual$n)
+
+nigeria_annual <- res_freq_annual_table %>% filter(Country_Origin=="Nigeria") %>% filter(n>=10)
+prop.trend.test(nigeria_annual$sumcipNS, nigeria_annual$n)
+prop.trend.test(nigeria_annual$sumMDR, nigeria_annual$n)
+
+tgc_from2010 %>% filter(Country_Origin=="Kenya") %>% group_by(Final_genotype, gyrA_S83F)%>% summarise(n=n()) %>% mutate(p=n/sum(n))
+tgc_from2010 %>% filter(Country_Origin=="Kenya") %>% group_by(Final_genotype, gyrA_S83Y)%>% summarise(n=n()) %>% mutate(p=n/sum(n))
+tgc_from2010 %>% filter(Country_Origin=="Kenya") %>% group_by(Final_genotype, gyrB_S464F)%>% summarise(n=n()) %>% mutate(p=n/sum(n))
+tgc_from2010 %>% filter(Country_Origin=="Nigeria") %>% group_by(Final_genotype, gyrA_S83Y)%>% summarise(n=n()) %>% mutate(p=n/sum(n))
+
+# cipS strains in Africa 
+tgc_from2010 %>% filter(Country_Origin=="Kenya" & !cipNS) %>% group_by(Final_genotype, Year) %>% summarise(n=n())
+
+# cipR backgrounds
+tgc_from2010_cipMut %>% filter(Country_Origin=="India") %>% mutate(p=n/sum(n))
+
+# other places with Indian triple-mutant strain
+tgc_from2010_cipMut %>% mutate(p=n/sum(n)) %>% filter(cip_genotype=="4.3.1.2 :: gyrA_D87N gyrA_S83F parC_S80I") 
+
+tgc_from2010_cipMut %>% filter(Country_Origin=="Nepal") %>% mutate(p=n/sum(n))
+
+tgc_from2010_cipMut %>% filter(Country_Origin=="Bangladesh") %>% mutate(p=n/sum(n))
+
+# cipR rise in India
+res_freq_annual_table %>% filter(Country_Origin=="India") %>% select(Year, n, cipR)
+```
+
+## numbers in text: MDR trends
+``` {r}
+# India MDR
+india_annual <- res_freq_annual_table %>% filter(Country_Origin=="India") %>% filter(n>=10)
+prop.trend.test(india_annual$sumMDR, india_annual$n)
+
+res_freq_annual_table %>% filter(Country_Origin=="India" & Year >=2016 & Year <=2020) %>% select(Year, n, MDR) %>% summarise(mean(MDR))
+
+res_freq_annual_table %>% filter(Country_Origin=="India" & Year >=2016 & Year <=2020) %>% select(Year, n, MDR)
+
+# Nepal MDR
+res_freq_annual_table %>% filter(Country_Origin=="Nepal") %>% select(Year, n, MDR)
+
+res_freq_annual_table %>% filter(Country_Origin=="Nepal") %>% select(Year, n, MDR) %>% filter(Year>2010) %>% summarise(mean(MDR))
+
+# Bangladesh
+bangladesh_annual <- res_freq_annual_table %>% filter(Country_Origin=="Bangladesh") %>% filter(n>=10)
+prop.trend.test(bangladesh_annual$sumMDR, bangladesh_annual$n)
+
+res_freq_annual_table %>% filter(Country_Origin=="Bangladesh" & Year >=2016 & Year <=2020) %>% select(Year, n, MDR) %>% summarise(mean(MDR))
+
+res_freq_annual_table %>% filter(Country_Origin=="Bangladesh" & Year >=2016 & Year <=2020) %>% select(Year, n, MDR)
+
+# Pakistan
+pakistan_annual <- res_freq_annual_table %>% filter(Country_Origin=="Pakistan") %>% filter(n>=10)
+prop.trend.test(pakistan_annual$sumMDR, pakistan_annual$n)
+
+res_freq_annual_table %>% filter(Country_Origin=="Pakistan" & Year >=2016 & Year <=2020) %>% select(Year, n, MDR) %>% summarise(mean(MDR))
+
+res_freq_annual_table %>% filter(Country_Origin=="Pakistan" & Year >=2016 & Year <=2020) %>% select(Year, n, MDR)
+
+# Kenya
+res_freq_annual_table %>% filter(Country_Origin=="Kenya") %>% select(Year, n, MDR)
+
+# Malawi
+res_freq_annual_table %>% filter(Country_Origin=="Malawi") %>% select(Year, n, MDR)
+
+# Nigeria
+res_freq_annual_table %>% filter(Country_Origin=="Nigeria") %>% select(Year, n, MDR)
+
+# Nigeria trend
+nigeria_annual <- res_freq_annual_table %>% filter(Country_Origin=="Nigeria") %>% filter(n>=10)
+prop.trend.test(nigeria_annual$sumMDR, nigeria_annual$n)
+
+# Cambodia
+cambodia_annual <- res_freq_annual_table %>% filter(Country_Origin=="Cambodia") %>% filter(n>=10)
+prop.trend.test(cambodia_annual$sumMDR, cambodia_annual$n)
+```
+
+# Fig S11: Presence of IncHI1 amongst MDR strains
+``` {r inchi1_freq}
+
+# melted way, with legend
+annual_mdr_inc_rates <- res_freq_annual_table %>% 
+    filter(Country_Origin %in% c("Kenya", "Nigeria", "Ghana", "Malawi", "South Africa", "Bangladesh", "Pakistan", "Cambodia")) %>% # only countries with sufficient MDR
+    filter(n>=8) # plot only those years with sufficient data
+
+annual_mdr_inc_rates$Country_Origin <- factor(annual_mdr_inc_rates$Country_Origin, levels=c("Kenya", "Nigeria", "Ghana", "Malawi", "South Africa", "Bangladesh", "Pakistan", "Cambodia"))
+
+annual_mdr_inc_lineplot <- annual_mdr_inc_rates %>%
+  as.data.frame() %>%
+    melt(id.vars=c("Country_Origin","Year"), variable.name="AMR") %>%
+    filter(AMR %in% c("MDR","IncHI1 amongst MDR")) %>%
+  ggplot(aes(Year, value, color=AMR)) +    
+  geom_line( size = 1, alpha=0.5, aes(group=AMR)) +
+  geom_point( size = 1, alpha=0.5) +
+  facet_wrap(. ~ Country_Origin, ncol=4) + theme_bw() +
+  scale_color_manual(values=c("red","blue")) + 
+  ylab("Prevalence (%)") +
+  labs(color="") + 
+  theme(strip.background = element_blank(), strip.text=element_text(size=10, face="bold"), axis.text.x = element_text(angle = 45, hjust = 1, size = 6, colour = "black"), legend.title = element_text(size=10, face="bold"), legend.position="bottom")
+
+annual_mdr_inc_lineplot
+```
+
+## Make with line plots for annual MDR and IncHI1 fraction
+``` {r AMR_lineplot_IncHI1, eval=T}
+
+pdf(paste0("SuppFig11_annual_MDR_IncHI1_lineplots_",todays_date,".pdf"), width=6, height=5)
+annual_mdr_inc_lineplot
+dev.off()
+
+png(paste0("SuppFig11_annual_MDR_IncHI1_lineplots_",todays_date,".png"), width=6, height=5, units="in", res=400)
+annual_mdr_inc_lineplot
+dev.off()
+```
+
+## Bangladesh - MDR trend within 4.3.1.1
+``` {r}
+bangladesh_4311_annual <- tgc_meta %>% 
+  filter(Country_Origin == "Bangladesh") %>% 
+  filter(Final_genotype=="4.3.1.1") %>%
+  mutate(IncHI1= (grepl("IncHI1",`Inc Types`) && MDR)) %>%
+  select(Country_Origin, Final_genotype, IncHI1, Year, MDR) %>%
+  group_by(Country_Origin, Year) %>% 
+  summarize(n=n(), 
+            sumMDR = sum(MDR),
+            `IncHI1 amongst MDR` = sum(IncHI1),
+            .groups = "keep"
+            ) %>% 
+  filter(n>=10)
+
+prop.trend.test(bangladesh_4311_annual$sumMDR, bangladesh_4311_annual$n)
+```
+
+# cefR details - data for Table 2
+``` {r cefR_details}
+cefR_strains <- tgc_all %>% filter(CEP==1) %>%
+  mutate(ESBL = ifelse(`blaCTX-M-12`==1, "blaCTX-M-12", ifelse(`blaCTX-M-15_23`==1, "blaCTX-M-15", ifelse (`blaCTX-M-55`==1, "blaCTX-M-55", ifelse(`blaSHV-12`==1, "blaSHV-12", ""))))) %>% 
+  mutate(geno_ESBL = paste(Final_genotype, ESBL))
+
+cefR_strains_table <- cefR_strains %>% 
+  select(Country_Origin, ESBL, Final_genotype, Year) %>%
+  group_by(Final_genotype, ESBL, Country_Origin) %>%
+  summarize(n=n(),
+            min=min(Year),
+            max=max(Year),
+            .groups = "keep") %>%
+  mutate(Years=ifelse(min==max, min, paste0(min,"-",max))) %>%
+  select(-min, -max) %>%
+  rename(Genotype=Final_genotype, `ESBL gene`=ESBL, `Country of Origin`=Country_Origin)
+
+cefR_strains_table
+
+```
+
+``` {r incY}
+incY <- tgc_all %>% filter(grepl("IncY",`Inc Types`)) %>% filter(Final_genotype !="4.3.1.1.P1")
+
+table(incY$Final_genotype)
+
+incY_311 <- incY %>% filter(Final_genotype =="3.1.1")
+
+# note all but one are IncHI1 negative
+table(incY_311$`Inc Types`)
+
+```
+
+# AziR details
+## details of acrB mutants
+``` {r acrB_details}
+azi_strains <- tgc_all %>% filter(acrB_R717L==1 | acrB_R717Q==1)
+
+nrow(azi_strains)
+
+azi_strains <- azi_strains %>% mutate(acrB = ifelse(acrB_R717L==1, "R717L", ifelse(acrB_R717Q==1, "R717Q", "")))
+
+azi_strains <- azi_strains %>% mutate(geno_acrB = paste(Final_genotype, acrB))
+
+length(unique(azi_strains$geno_acrB))
+
+table(paste(azi_strains$Final_genotype, azi_strains$acrB), azi_strains$Country_Origin)
+```
+
+## acrB plots
+``` {r acrB_plots}
+azi_country_cols <- c(Bangladesh="#2F9599", India="#EC2049", Nepal="#F7DB4F", Pakistan="#F26B38", Samoa="#9DE0AD", Singapore="#8dbaee")
+
+azi_mutations <- ggplot(azi_strains, aes(x=geno_acrB)) + 
+  geom_bar(aes(fill=Country_Origin)) + 
+  coord_flip() + 
+  scale_fill_manual(values=azi_country_cols) +
+  theme_bw() +
+  ylab("Genome count")+
+  xlab("Genotype + acrB mutation") + 
+  ggtitle("b) acrB mutants by country") +
+  labs(fill="Country")  + theme(legend.position = "none")
+
+azi_year <- ggplot(azi_strains, aes(x=Year)) + 
+  geom_bar(aes(fill=Country_Origin)) + 
+  scale_fill_manual(values=azi_country_cols) +
+  theme_bw() +
+  ylab("Genome count")+
+  xlab("Year") + 
+  ggtitle("a) Distribution of acrB mutants") +
+  labs(fill="Country") 
+
+table(azi_strains$Country_Origin)
+
+table(azi_strains$Country_Origin)/nrow(azi_strains)
+```
+
+## Fig 5: acrB mutations
+``` {r aziR_genomes_pdf, eval=T}
+pdf(paste0("Fig5_azi_mutations_country_",todays_date,".pdf"))
+azi_year / azi_mutations
+dev.off()
+
+png(paste0("Fig5_azi_mutations_country_",todays_date,".png"), width=7, height=7, units="in", res=400)
+azi_year / azi_mutations
+dev.off()
+```
+
