@@ -1,7 +1,7 @@
 ---
 title: "Trees"
 author: "Kat Holt"
-date: "20/10/2022"
+date: "27/10/2022"
 output:
   html_document:
     toc: true
@@ -30,7 +30,7 @@ library(ggnewscale)
 
 # Load metadata
 ``` {r load_data}
-tgc_all <- read_csv("../TGC_data_121022.csv")
+tgc_all <- read_csv("../TGC_data_271022.csv")
 ```
 
 # 4.3.1.1.P1 tree
@@ -38,7 +38,7 @@ tgc_all <- read_csv("../TGC_data_121022.csv")
 ## load tree
 ``` {r}
 # tipnames match on 'DisplayName' column
-t <- read.tree("pathogenwatch-styphi-jf64rcfrxdyy-rwp1-pk1-klemm-rasheed-collection-tree.nwk")
+t <- read.tree("pathogenwatch-styphi-5bremw9hym3y-rwp1-pk1-context-collection-tree.nwk")
 
 t_noOutgroup <- drop.tip(t, "4714STDY6831711") # drop 3.0.1 outlier as it obscures detail
 t_noOutgroup <- drop.tip(t_noOutgroup, "4714STDY6837119") # drop long branch strain 4714STDY6837119
@@ -105,7 +105,7 @@ XDR_tree_part2
 ```
 
 ## Fig 4: Pathogenwatch tree of Pakistan isolates showing position of Rwp1-PK1
-``` {r, eval=F}
+``` {r, eval=T}
 
 pdf(file="Fig4_Rwp1-PK1_Pakistan_tree.pdf",width=6, height=8)
 XDR_tree_part2
@@ -119,9 +119,10 @@ dev.off()
 
 # 2.3.2 tree
 
-## load tree link data
+## load tree and link data
 ``` {r}
-t232 <- read.tree("pathogenwatch-styphi-pvmrvujfye41-typhi-232-plus-ingle-2021-for-outgrouping-collection-tree__2.3.2_ingroup.nwk")
+# tree of n=164 2.3.2 plus genomes from Ingle et al, 2021 to use as outgroups to root the 2.3.2 subtree; tree generated using Pathogenwatch
+t232_outgroups <- read.tree("pathogenwatch-styphi-ghqgw866b3dl-typhi-232-plus-outgroups-collection-tree.nwk")
 
 tips232 <- read_csv("pw232_to_ID.csv")
 
@@ -132,14 +133,21 @@ tips232 <- read_csv("pw232_to_ID.csv")
 
 # get metadata for plotting, col1 = PW_NAME matches the tree
 tgc_232 <- left_join(tips232, tgc_all) %>% 
-  select(PW_NAME, Region, cipIR) %>%
+  select(PW_NAME, Region, cipNS, Final_genotype) %>%
   mutate(Region = replace(Region, is.na(Region), "Not Provided")) %>%
   rename(label=PW_NAME)
 
-# join tree and data
-treedat_232 <- full_join(as_tibble(t232), tgc_232, by = c("label"))
+# join full tree and 2.3.2 data
+treedat_232_outgroups <- full_join(as_tibble(t232_outgroups), tgc_232, by = c("label"))
 
-# nodes defining regional clades
+# find MRCA node for 2.3.2 genomes
+mrca_232 <- MRCA(treedat_232_outgroups, na.omit(treedat_232_outgroups$node[treedat_232_outgroups$Final_genotype=="2.3.2"]))
+
+# extract subtree for 2.3.2
+t232 <-tree_subset(t232_outgroups, mrca_232$node, levels_back = 0)
+
+# attach data for plotting
+treedat_232 <- full_join(as_tibble(t232), tgc_232, by = c("label"))
 
 ```
 
@@ -166,6 +174,7 @@ region_cols <- c(Caribbean = "gold1",
                     Europe = "purple",
                     `Not Provided` = "grey")
 
+# nodes defining regional clades
 central_america_clade <- 171
 west_africa_clade_1 <- 249
 west_africa_clade_2 <- 254
@@ -180,15 +189,15 @@ tree_232_plot <- ggtree(as.treedata(treedat_232)) +
   geom_highlight(node=west_africa_clade_3, fill=region_cols["Western Africa"], alpha=.25, extend=5) + 
   geom_highlight(node=caribbean_clade, fill=region_cols["Caribbean"], alpha=.25, extend=5) + 
   geom_highlight(node=south_america_clade, fill=region_cols["South America"], alpha=.25, extend=5) + 
-  geom_tippoint(aes(color = Region, shape=cipIR)) +
+  geom_tippoint(aes(color = Region, shape=cipNS)) +
   scale_colour_manual(values = region_cols) +
   labs(color="Region", shape="CipNS") + vexpand(.08, 1)
 
 tree_232_plot
 ```
 
-## Fig S4: Pathogenwatch tree of 2.3.2 isolates
-``` {r, eval=F}
+## Fig S4: Outgroup-rooted Pathogenwatch tree of 2.3.2 isolates
+``` {r, eval=T}
 
 pdf(file="FigS4_232_tree.pdf",width=6, height=6)
 tree_232_plot
