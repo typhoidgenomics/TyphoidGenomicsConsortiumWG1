@@ -12,15 +12,17 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 * genotype and AMR columns are derived using the [Mykrobe implementation](https://github.com/katholt/genotyphi) of the [GenoTyphi](https://doi.org/10.1093/infdis/jiab414) scheme, and [Typhi Pathogenwatch](https://doi.org/10.1038/s41467-021-23091-2)
 
+`UN_region_coords.csv` 
+
+* GPS coordinates for world regions, used to generate world map of genotypes
+
 ## Genotype analysis
 
 `/genotypes` directory
 
-* `genotypes_271022.Rmd` = R markdown file for all analysis, generating tables and figures
+* `genotypes_281022.Rmd` = R markdown file for all analysis, generating tables and figures
 
-* `genotypes_271022.html` = knitR output of Rmd file, including all figures and numbers included in text
-
-* `UN_region_coords.csv` = GPS coordinates for world regions, used to generate world map of genotypes
+* `genotypes_281022.html` = knitR output of Rmd file, including all figures and numbers included in text
 
 * figure files (PNG and PDF format; output from executing Rmd file)
 
@@ -30,9 +32,9 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 `/AMR` directory
 
-* `AMR_summary_271022.Rmd` = R markdown file for all analysis, generating tables and figures
+* `AMR_summary_281022.Rmd` = R markdown file for all analysis, generating tables and figures
 
-* `AMR_summary_271022.html` = knitR output of Rmd file, including all figures and numbers included in text
+* `AMR_summary_281022.html` = knitR output of Rmd file, including all figures and numbers included in text
 
 * figure files (PNG and PDF format; output from executing Rmd file)
 
