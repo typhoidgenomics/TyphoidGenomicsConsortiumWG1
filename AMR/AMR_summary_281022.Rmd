@@ -36,7 +36,7 @@ library(maps)
 ## Load data
 ``` {r load_data}
 
-tgc_all <- read_csv("../TGC_data_271022.csv") %>% 
+tgc_all <- read_csv("../TGC_data_281022.csv") %>% 
   filter(exclude_assembly != TRUE) %>% 
   mutate(aziR=replace(aziR, ereA==1, T))
 

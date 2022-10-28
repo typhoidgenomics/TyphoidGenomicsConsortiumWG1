@@ -40,7 +40,7 @@ library(janitor)
 ## Load data
 ``` {r load_data}
 
-tgc_all <- read_csv("../TGC_data_271022.csv")
+tgc_all <- read_csv("../TGC_data_281022.csv")
 
 # total genomes
 nrow(tgc_all)
@@ -845,14 +845,13 @@ country_lab_year_data_SA <- country_lab_year_data_SA %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="RDT", "Bathalapalli (RDT)")) %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="SAP", "New Delhi (SAP)")) %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="CMC", "Vellore (CMC)")) %>%
-  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="KIMS", "Mumbai (KIM)")) %>%
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="BCH", "Mumbai (KIM)")) %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="PGI", "Chandigarh (PGI)")) %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="SJB", "Bengaluru (SJB)")) %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="KUH", "Dhulikhel (KUH)")) %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="PAH", "Lalitpur (PAH)")) %>%
   mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="AKU", "Karachi (AKU)")) %>%
-  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="JHL", "Lahore (JHL)")) %>%
-  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="SEFI", "Multi-site (SEFI)")) 
+  mutate(`Isolating Lab` = replace(`Isolating Lab`, `Isolating Lab`=="JHL", "Lahore (JHL)"))
 
 lab_N_SA <- country_lab_year_data_SA %>%
   group_by(Country_Origin, `Isolating Lab`)%>% 
