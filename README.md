@@ -4,7 +4,7 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 ## Main data file 
 
-`TGC_data_271022.csv`
+`TGC_data_281022.csv`
 
 * line list of all genomes including data accessions, source information, plus genome-derived genotype and AMR variables
 
