@@ -95,17 +95,17 @@ res_freq_table <- res_data %>%
   group_by(Country_Origin)%>%
   summarize(n=n(),
             sumMDR= sum(MDR),
-            MDR= round(sumMDR/n*100, digits =0),
+            MDR= signif(sumMDR/n*100, digits=2),
             sumXDR= sum(XDR),
-            XDR= round(sumXDR/n*100, digits = 0),
+            XDR= signif(sumXDR/n*100, digits=2),
             sumcipNS = sum(cipNS),
-            cipNS = round(sumcipNS/n*100, digits = 0),
+            cipNS = signif(sumcipNS/n*100, digits=2),
             sumcipR = sum(cipR),
-            cipR = round(sumcipR/n*100, digits = 0),
+            cipR = signif(sumcipR/n*100, digits=2),
             sumcefR = sum(cefR),
-            cefR = round(sumcefR/n*100, digits = 0),
+            cefR = signif(sumcefR/n*100, digits=2),
             sumaziR = sum(aziR),
-            aziR = round(sumaziR/n*100, digits =0),
+            aziR = signif(sumaziR/n*100, digits=2),
             MDR_se = sqrt((sumMDR/n*(1-sumMDR/n))/n),
             XDR_se = sqrt((sumXDR/n*(1-sumXDR/n))/n),
             cipNS_se = sqrt((sumcipNS/n*(1-sumcipNS/n))/n),
@@ -121,17 +121,17 @@ res_freq_table_region <- res_data %>%
   group_by(Region)%>%
   summarize(n=n(),
             sumMDR= sum(MDR),
-            MDR= round(sumMDR/n*100, digits =0),
+            MDR= signif(sumMDR/n*100, digits=2),
             sumXDR= sum(XDR),
-            XDR= round(sumXDR/n*100, digits = 0),
+            XDR= signif(sumXDR/n*100, digits=2),
             sumcipNS = sum(cipNS),
-            cipNS = round(sumcipNS/n*100, digits = 0),
+            cipNS = signif(sumcipNS/n*100, digits=2),
             sumcipR = sum(cipR),
-            cipR = round(sumcipR/n*100, digits = 0),
+            cipR = signif(sumcipR/n*100, digits=2),
             sumcefR = sum(cefR),
-            cefR = round(sumcefR/n*100, digits = 0),
+            cefR = signif(sumcefR/n*100, digits=2),
             sumaziR = sum(aziR),
-            aziR = round(sumaziR/n*100, digits =0),
+            aziR = signif(sumaziR/n*100, digits=2),
             MDR_se = sqrt((sumMDR/n*(1-sumMDR/n))/n),
             XDR_se = sqrt((sumXDR/n*(1-sumXDR/n))/n),
             cipNS_se = sqrt((sumcipNS/n*(1-sumcipNS/n))/n),
@@ -177,9 +177,11 @@ res_freq_groups$Country_Origin <- factor(res_freq_groups$Country_Origin, levels=
 
 ## Fig 2: country-level traffic light plot
 ``` {r make_trafficlight_plot}
-traffic_light  <- ggplot(res_freq_groups, aes(y= Country_Origin, x = variable))+
+traffic_light  <- res_freq_groups %>%
+  mutate(value=replace(value, value==0.044, value=0.04)) %>%
+  ggplot(aes(y= Country_Origin, x = variable))+
   geom_point(aes(color=Groups), size=12)+
-  geom_text(aes(label = paste(value, "%", sep = "")), color = "white", fontface = "bold")+
+  geom_text(aes(label = paste(value, "%", sep = "")), color = "white", fontface = "bold", size=3)+
   scale_color_manual(values = traffic_colours, breaks = levels(res_freq_groups$Groups))+
   theme_bw()+
   ylab("")+
@@ -225,7 +227,7 @@ region_traffic_light  <- res_freq_groups_region %>%
   filter(Region %in% res_freq_table_region$Region[res_freq_table_region$n>=20]) %>%
   ggplot(aes(y= Region, x = variable))+
   geom_point(aes(color=Groups), size=12)+
-  geom_text(aes(label = paste(value, "%", sep = "")), color = "white", fontface = "bold")+
+  geom_text(aes(label = paste(value, "%", sep = "")), color = "white", fontface = "bold", size=3)+
   scale_color_manual(values = traffic_colours, breaks = levels(res_freq_groups_region$Groups))+
   theme_bw()+
   ylab("")+
