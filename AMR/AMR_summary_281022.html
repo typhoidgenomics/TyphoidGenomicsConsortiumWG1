@@ -166,7 +166,7 @@ pre code {
 
 <h1 class="title toc-ignore">Data analyses for Global Typhoid Genomics Consortium Paper - Working Group 1 (Descriptive Stats - AMR)</h1>
 <h4 class="author">Kat AMR</h4>
-<h4 class="date">28/10/2022</h4>
+<h4 class="date">31/10/2022</h4>
 
 </div>
 
@@ -231,7 +231,7 @@ pre code {
 <h1>Prepare data</h1>
 <div id="load-data" class="section level2">
 <h2>Load data</h2>
-<pre class="r"><code>tgc_all &lt;- read_csv(&quot;../TGC_data_281022.csv&quot;) %&gt;% 
+<pre class="r"><code>tgc_all &lt;- read_csv(&quot;../TGC_data_311022.csv&quot;) %&gt;% 
   filter(exclude_assembly != TRUE) %&gt;% 
   mutate(aziR=replace(aziR, ereA==1, T))</code></pre>
 <pre><code>## Rows: 13000 Columns: 105

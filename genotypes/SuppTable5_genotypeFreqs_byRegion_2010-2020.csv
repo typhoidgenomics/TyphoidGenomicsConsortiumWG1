@@ -1,4 +1,4 @@
-"Region","Genotype","Year","x","N","p","p_lowerCI","p_upperCI"
+"Region","Genotype","Year","x","N","proportion","p_lowerCI","p_upperCI"
 "Australia and New Zealand","2.2.1","2010",2,2,1,1,1
 "Australia and New Zealand","2.4","2012",1,2,0.5,0,1
 "Australia and New Zealand","4.3.1.1","2012",1,2,0.5,0,1

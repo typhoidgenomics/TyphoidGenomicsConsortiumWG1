@@ -1,7 +1,7 @@
 ---
 title: "Data analyses for Global Typhoid Genomics Consortium Paper - Working Group 1 (Descriptive Stats - AMR)"
 author: "Kat AMR"
-date: "28/10/2022"
+date: "31/10/2022"
 output:
   html_document:
     toc: true
@@ -36,7 +36,7 @@ library(maps)
 ## Load data
 ``` {r load_data}
 
-tgc_all <- read_csv("../TGC_data_281022.csv") %>% 
+tgc_all <- read_csv("../TGC_data_311022.csv") %>% 
   filter(exclude_assembly != TRUE) %>% 
   mutate(aziR=replace(aziR, ereA==1, T))
 
