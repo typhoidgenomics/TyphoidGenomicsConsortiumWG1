@@ -132,6 +132,23 @@ source_vs_health <- source_vs_health[c("Blood", "Stool", "Urine", "Gallbladder",
 write.csv(source_vs_health, file=paste0("SuppTable3_health_vs_source_excludeFails.csv"))
 ```
 
+## Table X - summary of contributing papers  
+``` {r}
+paper_summary <- tgc_all %>%
+  mutate(source=ifelse(is.na(PMID), `Isolating Lab`, PMID)) %>%
+    group_by(source)%>% 
+    summarize(Total =n(),
+              `Representative surveillance 2010-2020` =sum(Year >= 2010 & assumedAcute & untargetedSurveillance), 
+              `Travel Associated`=sum(`Travel Associated`=="Yes" & Year >= 2010 & assumedAcute & untargetedSurveillance)) %>%
+  adorn_totals("row")
+
+paper_summary
+```
+
+``` {r eval=T}
+write.csv(paper_summary, file=paste0("TableX_sourcePublication_summary.csv"), row.names=F)
+```
+
 ## Table 1 - summary of genomes by region  
 ``` {r}
 region_summary <- tgc_all %>%
