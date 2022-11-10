@@ -10,6 +10,8 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 * see metadata template [bit.ly/typhiMeta](bit.ly/typhiMeta) for details of source data coding
 
+* countries were assigned to geographical regions according to the [United Nations Statistics Division standard M49] (https://unstats.un.org/unsd/methodology/m49/overview/), using 'intermediate region' label where assigned and 'subregion' otherwise 
+
 * genotype and AMR columns are derived using the [Mykrobe implementation](https://github.com/katholt/genotyphi) of the [GenoTyphi](https://doi.org/10.1093/infdis/jiab414) scheme, and [Typhi Pathogenwatch](https://doi.org/10.1038/s41467-021-23091-2)
 
 `UN_region_coords.csv` 
