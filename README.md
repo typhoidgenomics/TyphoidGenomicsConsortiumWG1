@@ -4,7 +4,7 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 ## Main data file 
 
-`TGC_data_311022.csv`
+`TGC_data_031222.csv`
 
 * line list of all genomes including data accessions, source information, plus genome-derived genotype and AMR variables
 
@@ -22,9 +22,9 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 `/genotypes` directory
 
-* `genotypes_311022.Rmd` = R markdown file for all analysis, generating tables and figures
+* `genotypes.Rmd` = R markdown file for all analysis, generating tables and figures
 
-* `genotypes_311022.html` = knitR output of Rmd file, including all figures and numbers included in text
+* `genotypes.html` = knitR output of Rmd file, including all figures and numbers included in text
 
 * figure files (PNG and PDF format; output from executing Rmd file)
 
@@ -34,9 +34,9 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 `/AMR` directory
 
-* `AMR_summary_281022.Rmd` = R markdown file for all analysis, generating tables and figures
+* `AMR_summary.Rmd` = R markdown file for all analysis, generating tables and figures
 
-* `AMR_summary_281022.html` = knitR output of Rmd file, including all figures and numbers included in text
+* `AMR_summary.html` = knitR output of Rmd file, including all figures and numbers included in text
 
 * figure files (PNG and PDF format; output from executing Rmd file)
 
