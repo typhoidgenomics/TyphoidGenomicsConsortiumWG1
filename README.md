@@ -1,6 +1,8 @@
 # Typhoid Genomics Consortium Paper: Global distribution of genotypes and AMR (2022)
 
-This repo holds the data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/).
+This repo holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/).
+
+Raw data are publicly available under the accessions given in file `TGC_data_031222.csv` in this repository, and the genome assemblies used in this analysis are available in FigShare under doi: [10.26180/21431883](https://doi.org/10.26180/21431883).
 
 ## Main data file 
 
