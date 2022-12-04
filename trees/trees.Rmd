@@ -1,7 +1,7 @@
 ---
-title: "Trees"
+title: "Data analyses for Global Typhoid Genomics Consortium Paper - Working Group 1 (Descriptive Stats - trees)"
 author: "Kat Holt"
-date: "31/10/2022"
+date: "03/12/2022"
 output:
   html_document:
     toc: true
@@ -30,7 +30,7 @@ library(ggnewscale)
 
 # Load metadata
 ``` {r load_data}
-tgc_all <- read_csv("../TGC_data_311022.csv")
+tgc_all <- read_csv("../TGC_data_031222.csv")
 ```
 
 # 4.3.1.1.P1 tree
