@@ -34,9 +34,9 @@ This repo holds the data and code behind the first paper of the [Typhoid Genomic
 
 `/AMR` directory
 
-* `AMR_summary_311022.Rmd` = R markdown file for all analysis, generating tables and figures
+* `AMR_summary_281022.Rmd` = R markdown file for all analysis, generating tables and figures
 
-* `AMR_summary_311022.html` = knitR output of Rmd file, including all figures and numbers included in text
+* `AMR_summary_281022.html` = knitR output of Rmd file, including all figures and numbers included in text
 
 * figure files (PNG and PDF format; output from executing Rmd file)
 
