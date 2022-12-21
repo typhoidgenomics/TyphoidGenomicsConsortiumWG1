@@ -1,8 +1,16 @@
 # Typhoid Genomics Consortium Paper: Global distribution of genotypes and AMR (2022)
 
-This repo holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/).
+This repository holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/), "Global diversity and antimicrobial resistance of typhoid fever pathogens: insights from 13,000 Salmonella Typhi genomes" (Carey et al, 2022).
 
-Raw data are publicly available under the accessions given in file `TGC_data.csv` in this repository, and the genome assemblies used in this analysis are available in FigShare under doi: [10.26180/21431883](https://doi.org/10.26180/21431883). Assemblies of suitable quality (n=12,849; those with identifiers PW_id and PW_displayname in file `TGC_data.csv`) are included in the online platform Pathogenwatch (https://pathogen.watch/organisms/styphi), where they can be interactively explored and included in user-driven comparative analyses.
+## Licenses and and re-use:
+
+* The code in this repository is shared under a GNU general public license v3.0.
+
+* The data, figures and tables in this repository form part of the publication noted above, which is published under a Creative Commons 4.0 License. If you use material in this repository, you should cite both the paper and this repository as the source. This work represents the culmination of 20 years of typhoid genomics, with over 150 authors. It is here for the benefit of all, but please respect and acknowledge the effort of the authors when you come to re-use the data and ensure you cite appropriately.
+
+* Raw genome data (fastq readsets) are publicly available under the accessions given in file `TGC_data.csv` in this repository. The genome assemblies used in this analysis are available in FigShare under doi: [10.26180/21431883](https://doi.org/10.26180/21431883). Assemblies of suitable quality (n=12,849; those with identifiers PW_id and PW_displayname in file `TGC_data.csv`) are also included in the online platform Pathogenwatch (https://pathogen.watch/organisms/styphi), where they can be interactively explored and included in user-driven comparative analyses. 
+
+* PubMed identifiers for individual genomes are given in the file `TGC_data.csv`. If you use this data in a manner that focuses on particular subsets of genomes, we ask that you please identify and cite the relevant source papers in addition to citing the consortium paper - this ensures data contributors are maximally credited for their work and are more likely to be able to continue to collect and sequence Typhi isolates for public health benefit.
 
 ## Main data file 
 
@@ -19,6 +27,7 @@ Raw data are publicly available under the accessions given in file `TGC_data.csv
 `UN_region_coords.csv` 
 
 * GPS coordinates for world regions, used to generate world map of genotypes
+
 
 ## Genotype analysis
 
