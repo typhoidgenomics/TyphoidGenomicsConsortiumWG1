@@ -193,12 +193,13 @@ pre code {
 
 <div id="load-metadata" class="section level1">
 <h1>Load metadata</h1>
-<pre class="r"><code>tgc_all &lt;- read_csv(&quot;../TGC_data_031222.csv&quot;)</code></pre>
-<pre><code>## Rows: 13000 Columns: 105
+<pre class="r"><code>tgc_all &lt;- read_csv(&quot;../TGC_data.csv&quot;)</code></pre>
+<pre><code>## Warning: One or more parsing issues, see `problems()` for details</code></pre>
+<pre><code>## Rows: 13003 Columns: 110
 ## ── Column specification ────────────────────────────────────────────────────────
 ## Delimiter: &quot;,&quot;
-## chr (31): TGC_sangerlane, Data Accession, Study Accession, Sample Accession,...
-## dbl (66): CORE MATCHES, % CORE FAMILIES, % NON-CORE, GENOME LENGTH, N50, NO....
+## chr (32): TGC_sangerlane, Data Accession, Study Accession, Sample Accession,...
+## dbl (70): CORE MATCHES, % CORE FAMILIES, % NON-CORE, GENOME LENGTH, N50, NO....
 ## lgl  (8): MDR, cipNS, cipR, XDR, aziR, untargetedSurveillance, assumedAcute,...
 ## 
 ## ℹ Use `spec()` to retrieve the full column specification for this data.
@@ -232,7 +233,7 @@ tree_data_forHeatmap &lt;- tree_data %&gt;% select(-Final_genotype)
 
 # set genotype colours
 geno_info &lt;- read_csv(&quot;https://raw.githubusercontent.com/katholt/genotyphi/main/Genotype_specification.csv&quot;) %&gt;% filter(Genotype %in% tree_data$Final_genotype)</code></pre>
-<pre><code>## Rows: 82 Columns: 11
+<pre><code>## Rows: 87 Columns: 11
 ## ── Column specification ────────────────────────────────────────────────────────
 ## Delimiter: &quot;,&quot;
 ## chr (10): Genotype, H58 Genotype, Gene in CT18 reference sequence, Product, ...

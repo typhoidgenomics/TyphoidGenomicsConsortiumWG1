@@ -30,7 +30,7 @@ library(ggnewscale)
 
 # Load metadata
 ``` {r load_data}
-tgc_all <- read_csv("../TGC_data_031222.csv")
+tgc_all <- read_csv("../TGC_data.csv")
 ```
 
 # 4.3.1.1.P1 tree
