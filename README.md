@@ -2,11 +2,11 @@
 
 This repo holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/).
 
-Raw data are publicly available under the accessions given in file `TGC_data_031222.csv` in this repository, and the genome assemblies used in this analysis are available in FigShare under doi: [10.26180/21431883](https://doi.org/10.26180/21431883).
+Raw data are publicly available under the accessions given in file `TGC_data.csv` in this repository, and the genome assemblies used in this analysis are available in FigShare under doi: [10.26180/21431883](https://doi.org/10.26180/21431883). Assemblies of suitable quality (n=12,849; those with identifiers PW_id and PW_displayname in file `TGC_data.csv`) are included in the online platform Pathogenwatch (https://pathogen.watch/organisms/styphi), where they can be interactively explored and included in user-driven comparative analyses.
 
 ## Main data file 
 
-`TGC_data_031222.csv`
+`TGC_data.csv`
 
 * line list of all genomes including data accessions, source information, plus genome-derived genotype and AMR variables
 
