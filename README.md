@@ -10,7 +10,7 @@ This repository holds the tabulated data and code behind the first paper of the 
 
 * Raw genome data (fastq readsets) are publicly available under the accessions given in file `TGC_data.csv` in this repository. The genome assemblies used in this analysis are available in FigShare under doi: [10.26180/21431883](https://doi.org/10.26180/21431883). Assemblies of suitable quality (n=12,849; those with identifiers PW_id and PW_displayname in file `TGC_data.csv`) are also included in the online platform Pathogenwatch (https://pathogen.watch/organisms/styphi), where they can be interactively explored and included in user-driven comparative analyses. 
 
-* PubMed identifiers for individual genomes are given in the file `TGC_data.csv`. If you use this data in a manner that focuses on particular subsets of genomes, we ask that you please identify and cite the relevant source papers in addition to citing the consortium paper - this ensures data contributors are maximally credited for their work and are more likely to be able to continue to collect and sequence Typhi isolates for public health benefit.
+* PubMed identifiers for individual genomes are given in the file `TGC_data.csv`. If you use this data in a manner that focuses on particular subsets of genomes (e.g. those from a particular country or substudy), we ask that you please identify and cite the relevant source papers in addition to citing the consortium paper - this ensures data contributors are maximally credited for their work, and are more likely to be able to continue to generate and share Typhi sequences for research and public health benefit.
 
 ## Main data file 
 
