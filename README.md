@@ -18,7 +18,7 @@ This repository holds the tabulated data and code behind the first paper of the 
 
 * line list of all genomes including data accessions, source information, plus genome-derived genotype and AMR variables
 
-* see metadata template [bit.ly/typhiMeta](bit.ly/typhiMeta) for details of source data coding
+* see metadata template [bit.ly/typhiMeta](https://bit.ly/typhiMeta) for details of source data coding
 
 * countries were assigned to geographical regions according to the [United Nations Statistics Division standard M49] (https://unstats.un.org/unsd/methodology/m49/overview/), using 'intermediate region' label where assigned and 'subregion' otherwise 
 
