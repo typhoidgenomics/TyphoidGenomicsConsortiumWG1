@@ -1,6 +1,6 @@
 # Typhoid Genomics Consortium Paper: Global distribution of genotypes and AMR (2022)
 
-This repository holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/), "Global diversity and antimicrobial resistance of typhoid fever pathogens: insights from 13,000 Salmonella Typhi genomes" (Carey et al, 2022).
+This repository holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/), "Global diversity and antimicrobial resistance of typhoid fever pathogens: insights from 13,000 Salmonella Typhi genomes" (Carey et al, 2022) - preprint [here in MedRxiv](https://www.medrxiv.org/content/10.1101/2022.12.28.22283969v1).
 
 ## Licenses and and re-use:
 
@@ -22,7 +22,7 @@ This repository holds the tabulated data and code behind the first paper of the 
 
 * countries were assigned to geographical regions according to the [United Nations Statistics Division standard M49] (https://unstats.un.org/unsd/methodology/m49/overview/), using 'intermediate region' label where assigned and 'subregion' otherwise 
 
-* genotype and AMR columns are derived using the [Mykrobe implementation](https://github.com/katholt/genotyphi) of the [GenoTyphi](https://doi.org/10.1093/infdis/jiab414) scheme, and [Typhi Pathogenwatch](https://doi.org/10.1038/s41467-021-23091-2)
+* genotype and AMR columns are derived using the [Mykrobe implementation](https://github.com/typhoidgenomics/genotyphi) of the [GenoTyphi](https://doi.org/10.1093/infdis/jiab414) scheme, and [Typhi Pathogenwatch](https://doi.org/10.1038/s41467-021-23091-2)
 
 `UN_region_coords.csv` 
 
