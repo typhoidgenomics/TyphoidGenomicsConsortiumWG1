@@ -1,6 +1,6 @@
 # Typhoid Genomics Consortium Paper: Global distribution of genotypes and AMR (2022)
 
-This repository holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/), "Global diversity and antimicrobial resistance of typhoid fever pathogens: insights from 13,000 Salmonella Typhi genomes" (Carey et al, 2022) - preprint [here in MedRxiv](https://www.medrxiv.org/content/10.1101/2022.12.28.22283969v1).
+This repository holds the tabulated data and code behind the first paper of the [Typhoid Genomics Consortium](https://typhoidgenomics.org/), "Global diversity and antimicrobial resistance of typhoid fever pathogens: insights from 13,000 Salmonella Typhi genomes" ([Carey et al, 2023, eLife](https://doi.org/10.7554/eLife.85867)).
 
 ## Licenses and and re-use:
 
